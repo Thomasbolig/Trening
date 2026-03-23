@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0B0B12">
+<title>TH Treningsprogram</title>
+
+<!-- ── SUPABASE — bytt ut disse to verdiene ── -->
+<script>
+  const SUPABASE_URL  = 'https://ubmneqtgvblgyirofleh.supabase.co';   // f.eks. https://abcdefgh.supabase.co
+  const SUPABASE_ANON = 'DIN_ANON_KEYeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVibW5lcXRndmJsZ3lpcm9mbGVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMDM1MjAsImV4cCI6MjA4OTg3OTUyMH0.Qz0D_XpLBCpcOjhVHk6E_dNUIch16ot4KkUVChU2YAg';        // lang streng som starter med eyJ...
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{background:#0B0B12;height:100%}
+body{background:#0B0B12;color:#F0F0F5;font-family:'DM Sans',system-ui,sans-serif;min-height:100%;-webkit-font-smoothing:antialiased;padding-bottom:100px}
+input,textarea,button,select{font-family:'DM Sans',system-ui,sans-serif}
+::-webkit-scrollbar{display:none}
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
+input[type=number]{-moz-appearance:textfield}
+
+/* ── AUTH SCREEN ── */
+#auth-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px 24px}
+.auth-logo{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:32px;letter-spacing:4px;color:#E8381A;margin-bottom:8px}
+.auth-sub{font-size:13px;color:#50505C;margin-bottom:40px}
+.auth-card{width:100%;max-width:360px;background:#111118;border:1px solid #1E1E2C;border-radius:16px;padding:24px}
+.auth-label{font-size:11px;color:#50505C;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;margin-top:16px}
+.auth-label:first-child{margin-top:0}
+.auth-input{width:100%;background:#090910;border:1.5px solid #1E1E2C;border-radius:9px;color:#F0F0F5;font-size:15px;padding:12px 14px;outline:none;transition:border-color .2s}
+.auth-input:focus{border-color:#E8381A66}
+.auth-btn{width:100%;margin-top:20px;padding:14px;background:#E8381A;border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.3px;transition:opacity .15s}
+.auth-btn:hover{opacity:.9}
+.auth-btn:disabled{opacity:.5;cursor:not-allowed}
+.auth-toggle{margin-top:14px;text-align:center;font-size:12px;color:#50505C}
+.auth-toggle a{color:#E8381A;cursor:pointer;text-decoration:none}
+.auth-err{margin-top:10px;font-size:12px;color:#E24B4A;text-align:center;min-height:18px}
+.auth-ok{margin-top:10px;font-size:12px;color:#22C97A;text-align:center}
+
+/* ── SYNC BAR ── */
+#sync-bar{position:fixed;top:0;left:0;right:0;z-index:200;background:#0B0B12;padding:6px 14px;display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#303038;border-bottom:1px solid #1A1A28;transition:all .3s;display:none}
+#sync-bar.visible{display:flex}
+#sync-bar.saving{color:#E8B84B}
+#sync-bar.saved{color:#22C97A}
+#sync-bar.error{color:#E24B4A}
+.sync-user{font-size:11px;color:#30303A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
+.logout-btn{background:transparent;border:1px solid #1E1E2C;border-radius:6px;color:#30303A;font-size:10px;padding:3px 8px;cursor:pointer;white-space:nowrap}
+.logout-btn:hover{color:#E8381A;border-color:#E8381A44}
+
+/* ── STICKY HEADER ── */
+#sticky{position:sticky;top:0;z-index:50;background:#0F0F18;border-bottom:1px solid #1A1A28}
+.top-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 0}
+.app-title{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:22px;letter-spacing:3px;color:#E8381A}
+.week-label{font-size:12px;color:#50505C}
+.week-label strong{color:#F0F0F5;font-size:13px}
+
+/* ── DAY TABS ── */
+.day-tabs{display:flex}
+.day-tab{flex:1;padding:8px 2px 10px;background:transparent;border:none;border-bottom:2.5px solid transparent;color:#484858;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:.5px;cursor:pointer;transition:all .15s;line-height:1.3;text-align:center}
+.day-tab.active{color:#F0F0F5;border-bottom-color:#E8381A}
+.day-tab small{display:block;font-size:9px;color:inherit;opacity:.6;margin-top:1px;font-family:'DM Sans',sans-serif;font-weight:500}
+
+/* ── WEEK ROW ── */
+.week-row{display:flex;gap:6px;padding:10px 14px;overflow-x:auto;border-bottom:1px solid #1A1A28;align-items:center}
+.wk-btn{flex-shrink:0;width:34px;height:34px;border-radius:50%;border:1.5px solid #22222E;background:transparent;color:#484858;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s}
+.wk-btn.has-data{border-color:#E8381A55;color:#C06040}
+.wk-btn.active{background:#E8381A;color:#fff;border-color:#E8381A;box-shadow:0 0 12px #E8381A55}
+.add-week-btn{flex-shrink:0;padding:0 10px;height:30px;border-radius:15px;border:1.5px dashed #303038;background:transparent;color:#505058;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap}
+.add-week-btn:hover{border-color:#E8381A66;color:#E8381A88}
+
+/* ── CONTENT ── */
+.content{padding:12px 14px 20px;max-width:520px;margin:0 auto}
+.day-header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:6px}
+.day-name{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:32px;line-height:1;color:#F0F0F5}
+.day-sub{font-size:12px;color:#606070;margin-top:1px}
+.prog-count{font-size:15px;font-weight:700;text-align:right}
+.prog-sub{font-size:10px;color:#404050;margin-top:1px}
+.prog-bar-wrap{height:3px;background:#18181F;border-radius:2px;overflow:hidden;margin-bottom:14px}
+.prog-bar{height:100%;background:#E8381A;border-radius:2px;transition:width .4s ease}
+.prog-bar.done{background:#22C97A}
+
+.sec-label{font-size:10px;font-weight:700;letter-spacing:2.5px;color:#30303A;text-transform:uppercase;margin:14px 0 8px}
+.warmup-card{background:#111118;border:1px solid #1E1E2C;border-left:3px solid #22C97A;border-radius:0 8px 8px 0;padding:10px 12px;font-size:13px;color:#707080;margin-bottom:4px;line-height:1.5}
+
+/* ── EXERCISE CARD ── */
+.ex-card{background:#111118;border:1px solid #1E1E2C;border-radius:12px;margin-bottom:8px;overflow:hidden}
+.ex-header{display:flex;align-items:center;gap:8px;padding:12px;cursor:pointer;user-select:none}
+.ex-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;letter-spacing:.3px;line-height:1.2;color:#F0F0F5;flex:1;min-width:0}
+.ex-sets-badge{background:#0D0D14;border:1px solid #1E1E2C;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;color:#60606A;white-space:nowrap;flex-shrink:0}
+.ex-meta-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:3px}
+.filled-chip{font-size:11px;font-weight:700;color:#E8381A}
+.fb-hint-chip{font-size:11px;font-weight:700}
+.fb-hint-chip.up{color:#22C97A}.fb-hint-chip.same{color:#E8B84B}.fb-hint-chip.down{color:#E24B4A}
+.chevron{color:#30303A;font-size:11px;transition:transform .2s;margin-left:auto;flex-shrink:0}
+.chevron.open{transform:rotate(90deg)}
+.ex-body{border-top:1px solid #18181F;padding:10px 12px 12px}
+
+/* ── SUPERSET ── */
+.ss-wrapper{background:#0C1820;border:1px solid #1E2A38;border-left:3px solid #3B82F6;border-radius:12px;margin-bottom:8px;overflow:hidden}
+.ss-top-bar{display:flex;align-items:center;padding:10px 12px 0;gap:8px;cursor:pointer}
+.ss-badge{font-size:9px;font-weight:700;letter-spacing:2px;color:#3B82F6;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:3px 8px}
+.ss-divider{display:flex;align-items:center;gap:8px;padding:6px 12px;font-size:9px;color:#3B82F6;letter-spacing:2px}
+.ss-divider::before,.ss-divider::after{content:'';flex:1;height:.5px;background:rgba(59,130,246,.2)}
+.ss-letter{width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.2);border:1px solid rgba(59,130,246,.4);color:#3B82F6;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ss-rest-row{padding:6px 12px 10px;display:flex;justify-content:flex-end;border-top:1px solid rgba(59,130,246,.1)}
+
+/* ── SET ROW ── */
+.set-row{display:flex;align-items:center;gap:5px;padding:7px 0;border-bottom:1px solid #14141C}
+.set-row:last-of-type{border-bottom:none}
+.set-num{width:22px;height:22px;border-radius:5px;background:#18181F;color:#40404C;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.weight-ctrl{flex:1;display:flex;align-items:center;background:#090910;border:1.5px solid #1E1E2C;border-radius:9px;overflow:hidden;height:50px;min-width:0;transition:border-color .2s}
+.weight-ctrl.filled{border-color:#E8381A55}
+.step-btn{width:40px;height:50px;background:transparent;border:none;color:#E8381A;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:.8}
+.weight-input-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;gap:1px}
+.prev-hint{font-size:9px;font-weight:700;line-height:1}
+.prev-hint.up{color:#22C97A}.prev-hint.same{color:#E8B84B}.prev-hint.down{color:#E24B4A}.prev-hint.none{color:#404050}
+.w-input{width:100%;background:transparent;border:none;color:#F0F0F5;font-size:20px;font-weight:700;text-align:center;outline:none;line-height:1}
+.w-unit{font-size:10px;color:#40404C;padding-right:6px;flex-shrink:0;font-weight:600}
+.fb-btn{width:34px;height:50px;border-radius:8px;border:1px solid #1E1E2C;background:transparent;color:#303038;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;font-weight:700}
+.fb-btn.act-up{background:rgba(34,201,122,.15);border-color:rgba(34,201,122,.5);color:#22C97A}
+.fb-btn.act-same{background:rgba(232,184,75,.15);border-color:rgba(232,184,75,.5);color:#E8B84B}
+.fb-btn.act-down{background:rgba(226,75,74,.15);border-color:rgba(226,75,74,.5);color:#E24B4A}
+.del-set-btn{width:26px;height:26px;border-radius:6px;border:1px solid #1E1E2C;background:transparent;color:#30303A;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.add-set-btn{width:100%;margin-top:8px;padding:7px;background:transparent;border:1px dashed #252530;border-radius:8px;color:#40404A;font-size:12px;cursor:pointer;letter-spacing:.3px}
+.add-set-btn:hover{border-color:#E8381A44;color:#E8381A88}
+.notes-area{width:100%;min-height:46px;background:#0D0D14;border:1px solid #1E1E2C;border-radius:8px;color:#808090;font-size:12px;padding:8px 10px;resize:vertical;outline:none;line-height:1.5;margin-top:10px;display:block}
+.timer-btn{float:right;margin-top:8px;padding:5px 14px;background:transparent;border:1px solid #2A2A38;border-radius:20px;color:#505060;font-size:11px;cursor:pointer;letter-spacing:.3px}
+.timer-btn:hover{border-color:#E8381A66;color:#E8381A}
+
+/* ── FLOATING TIMER ── */
+#float-timer{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#16162A;border:1px solid #2A2A40;border-radius:20px;padding:14px 20px;display:none;align-items:center;gap:16px;z-index:100;box-shadow:0 8px 40px rgba(0,0,0,.8);min-width:240px}
+.timer-digits{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:50px;line-height:1;color:#E8381A;letter-spacing:2px;min-width:80px;font-variant-numeric:tabular-nums}
+.timer-digits.urgent{color:#E24B4A}
+.timer-lbl{font-size:10px;color:#50505C;letter-spacing:1px;margin-bottom:2px;text-transform:uppercase}
+.skip-btn{margin-left:auto;background:#1E1E2C;border:1px solid #2A2A3A;color:#A0A0B0;border-radius:10px;padding:10px 16px;font-size:12px;cursor:pointer}
+
+/* ── ARM REHAB ── */
+.arm-item{padding:8px 0;border-top:1px solid #16161E}
+.arm-item:first-child{border-top:none}
+.arm-name{font-size:13px;font-weight:500;color:#C0C0CC;line-height:1.3}
+.arm-sets-txt{font-size:11px;color:#40404C;margin-top:2px}
+.info-box{background:#0F0F18;border:1px solid #1A1A28;border-radius:10px;padding:10px 13px;font-size:11px;color:#30303A;line-height:1.9;margin-top:14px}
+.info-box strong{color:#404048}
+
+/* ── EDIT BAR ── */
+.edit-bar{background:#0F0F18;border-top:1px solid #1A1A28;padding:8px 14px;display:flex;gap:8px;align-items:center;position:fixed;bottom:0;left:0;right:0;z-index:40;max-width:100%}
+.edit-btn{padding:7px 12px;background:transparent;border:1px solid #2A2A38;border-radius:8px;color:#60606A;font-size:11px;cursor:pointer;white-space:nowrap}
+.edit-btn:hover{border-color:#E8381A55;color:#E8381A}
+.edit-btn.primary{background:#E8381A;border-color:#E8381A;color:#fff}
+.edit-btn.danger{border-color:#E24B4A44;color:#E24B4A88}
+.edit-btn.danger:hover{background:rgba(226,75,74,.1);color:#E24B4A}
+
+/* ── MODAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:none;align-items:flex-end;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:#141420;border:1px solid #2A2A3A;border-radius:20px 20px 0 0;padding:20px 20px 40px;width:100%;max-width:520px;max-height:80vh;overflow-y:auto}
+.modal h3{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;margin-bottom:14px;color:#F0F0F5}
+.modal-label{font-size:11px;color:#50505C;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;margin-top:14px}
+.modal-input{width:100%;background:#0D0D14;border:1px solid #2A2A3A;border-radius:8px;color:#F0F0F5;font-size:14px;padding:10px 12px;outline:none;transition:border-color .2s}
+.modal-input:focus{border-color:#E8381A66}
+.modal-row{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #1A1A26}
+.modal-row:last-of-type{border-bottom:none}
+.modal-row-name{flex:1;font-size:13px;color:#C0C0CC}
+.modal-row-sub{font-size:11px;color:#404050;margin-top:1px}
+.modal-btns{display:flex;gap:8px;margin-top:18px}
+.modal-btns button{flex:1;padding:12px;border-radius:10px;border:none;font-size:14px;font-weight:600;cursor:pointer}
+.modal-cancel{background:#1E1E2C;color:#808090}
+.modal-confirm{background:#E8381A;color:#fff}
+</style>
+</head>
+<body>
+
+<!-- ── AUTH SCREEN ── -->
+<div id="auth-screen">
+  <div class="auth-logo">TH PROGRAM</div>
+  <div class="auth-sub">Logg inn for å synkronisere på alle enheter</div>
+  <div class="auth-card">
+    <div id="auth-mode-login">
+      <div class="auth-label">E-post</div>
+      <input class="auth-input" id="auth-email" type="email" inputmode="email" placeholder="din@epost.no" autocomplete="email">
+      <div class="auth-label">Passord</div>
+      <input class="auth-input" id="auth-password" type="password" placeholder="••••••••" autocomplete="current-password">
+      <button class="auth-btn" id="auth-login-btn" onclick="doLogin()">Logg inn</button>
+      <div class="auth-err" id="auth-err"></div>
+      <div class="auth-toggle">Ny bruker? <a onclick="showSignup()">Opprett konto</a></div>
+    </div>
+    <div id="auth-mode-signup" style="display:none">
+      <div class="auth-label">E-post</div>
+      <input class="auth-input" id="signup-email" type="email" inputmode="email" placeholder="din@epost.no" autocomplete="email">
+      <div class="auth-label">Passord (minst 6 tegn)</div>
+      <input class="auth-input" id="signup-password" type="password" placeholder="••••••••" autocomplete="new-password">
+      <div class="auth-label">Bekreft passord</div>
+      <input class="auth-input" id="signup-password2" type="password" placeholder="••••••••" autocomplete="new-password">
+      <button class="auth-btn" id="auth-signup-btn" onclick="doSignup()">Opprett konto</button>
+      <div class="auth-err" id="signup-err"></div>
+      <div class="auth-ok" id="signup-ok"></div>
+      <div class="auth-toggle">Har konto? <a onclick="showLogin()">Logg inn</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MAIN APP ── -->
+<div id="main-app" style="display:none">
+  <div id="sync-bar" class="visible">
+    <span class="sync-user" id="sync-user-label"></span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span id="sync-status">●</span>
+      <button class="logout-btn" onclick="doLogout()">Logg ut</button>
+    </div>
+  </div>
+  <div style="height:30px"></div><!-- spacer for sync-bar -->
+
+  <div id="sticky">
+    <div class="top-bar">
+      <span class="app-title">TH PROGRAM</span>
+      <span class="week-label">Uke <strong id="wk-label">1</strong></span>
+    </div>
+    <div class="day-tabs" id="day-tabs"></div>
+  </div>
+
+  <div class="week-row" id="week-row"></div>
+  <div class="content" id="content"></div>
+
+  <div class="edit-bar">
+    <button class="edit-btn" onclick="openAddExModal()">+ Øvelse</button>
+    <button class="edit-btn" onclick="openAddDayModal()">+ Dag</button>
+    <button class="edit-btn" onclick="openManageModal()">⚙ Administrer</button>
+  </div>
+</div>
+
+<div id="float-timer">
+  <div>
+    <div class="timer-lbl">Pause igjen</div>
+    <div class="timer-digits" id="timer-digits">0:00</div>
+  </div>
+  <button class="skip-btn" onclick="skipTimer()">Hopp ×</button>
+</div>
+
+<!-- ADD EXERCISE MODAL -->
+<div class="modal-bg" id="modal-add-ex">
+  <div class="modal">
+    <h3>Legg til øvelse</h3>
+    <div class="modal-label">Øvelsesnavn</div>
+    <input class="modal-input" id="new-ex-name" type="text" placeholder="f.eks. Knebøy med stang">
+    <div class="modal-label">Sett × reps</div>
+    <input class="modal-input" id="new-ex-sets" type="text" placeholder="f.eks. 3×10">
+    <div class="modal-label">Hvile (sekunder)</div>
+    <input class="modal-input" id="new-ex-rest" type="number" inputmode="numeric" placeholder="90" value="90">
+    <div class="modal-label">Type</div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="edit-btn" id="ex-type-single" onclick="setExType('ex')" style="flex:1">Vanlig øvelse</button>
+      <button class="edit-btn" id="ex-type-ss" onclick="setExType('ss')" style="flex:1">Supersett</button>
+    </div>
+    <div id="ss-extra" style="display:none">
+      <div class="modal-label">Øvelse B</div>
+      <input class="modal-input" id="new-ex-name-b" type="text" placeholder="f.eks. Sittende roing">
+      <div class="modal-label">Sett × reps (B)</div>
+      <input class="modal-input" id="new-ex-sets-b" type="text" placeholder="f.eks. 3×10">
+    </div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeModal('modal-add-ex')">Avbryt</button>
+      <button class="modal-confirm" onclick="confirmAddEx()">Legg til</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD DAY MODAL -->
+<div class="modal-bg" id="modal-add-day">
+  <div class="modal">
+    <h3>Legg til treningsdag</h3>
+    <div class="modal-label">Dag / navn</div>
+    <input class="modal-input" id="new-day-name" type="text" placeholder="f.eks. Lørdag – Full kropp">
+    <div class="modal-label">Kort kode (3–4 bokstaver)</div>
+    <input class="modal-input" id="new-day-short" type="text" placeholder="f.eks. LØR" maxlength="4">
+    <div class="modal-label">Undertittel</div>
+    <input class="modal-input" id="new-day-title" type="text" placeholder="f.eks. Full kropp">
+    <div class="modal-label">Oppvarming</div>
+    <input class="modal-input" id="new-day-warmup" type="text" placeholder="f.eks. Sykle 10 min">
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeModal('modal-add-day')">Avbryt</button>
+      <button class="modal-confirm" onclick="confirmAddDay()">Legg til dag</button>
+    </div>
+  </div>
+</div>
+
+<!-- MANAGE MODAL -->
+<div class="modal-bg" id="modal-manage">
+  <div class="modal">
+    <h3>Administrer</h3>
+    <div class="modal-label">Treningsdager</div>
+    <div id="manage-days-list"></div>
+    <div class="modal-label" style="margin-top:16px">Øvelser — <span id="manage-day-label" style="color:#F0F0F5"></span></div>
+    <div id="manage-ex-list"></div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeModal('modal-manage')">Lukk</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── SUPABASE CLIENT ──────────────────────────────────────────────────────────
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ── DEFAULT PROGRAM ──────────────────────────────────────────────────────────
+const DEFAULT_DAYS = [
+  {id:"mon",short:"MAN",name:"Mandag",title:"Underkropp 1",warmup:"Sykle 10 min + Romaskin 5 min",blocks:[
+    {type:"ss",id:"m_s0",rest:90,dSets:3,A:{id:"m_s0a",name:"Deadbug pilatesball m/vekter — varierte benretn.",sets:"3×12"},B:{id:"m_s0b",name:"Rygghev i stativ — vekter mot bryst",sets:"3×12"}},
+    {type:"ex",id:"m_1",name:"Frontbøy",sets:"3×8",rest:120,dSets:3},
+    {type:"ex",id:"m_2",name:"Markløft",sets:"3×10",rest:120,dSets:3},
+    {type:"ex",id:"m_3",name:"Gående «rackhold» utfall — ulik vekt over hodet",sets:"3×8/side",rest:90,dSets:3},
+    {type:"ex",id:"m_4",name:"Sittende hamstring curls",sets:"3×10",rest:90,dSets:3},
+    {type:"ex",id:"m_5",name:"Liggende hamstring curls på pilatesball",sets:"3×10",rest:90,dSets:3},
+    {type:"ex",id:"m_6",name:"Tåhev i tåhev-apparat (strake knær)",sets:"3×12",rest:90,dSets:3},
+  ]},
+  {id:"tue",short:"TIR",name:"Tirsdag",title:"Overkropp 1",warmup:"Generell oppvarming inkl. rehabøvelser bicep + skulder",blocks:[
+    {type:"ss",id:"t_s0",rest:90,dSets:3,A:{id:"t_s0a",name:"Brystpress med manualer — flatbenk",sets:"3×8"},B:{id:"t_s0b",name:"1-arms roing med manual på benk",sets:"3×8"}},
+    {type:"ss",id:"t_s1",rest:90,dSets:3,A:{id:"t_s1a",name:"Skråbenk med stang",sets:"3×10"},B:{id:"t_s1b",name:"Sittende kabelroing",sets:"3×10"}},
+    {type:"ss",id:"t_s2",rest:90,dSets:3,A:{id:"t_s2a",name:"Sittende skulderpress med manualer (70° benk)",sets:"3×10"},B:{id:"t_s2b",name:"Nedtrekk — supinert grep",sets:"3×10"}},
+    {type:"ss",id:"t_s3",rest:90,dSets:3,A:{id:"t_s3a",name:"Incline bicep curls (60–70° benk)",sets:"3×10"},B:{id:"t_s3b",name:"Skullcrushers med stang/manualer",sets:"3×10"}},
+    {type:"ss",id:"t_s4",rest:90,dSets:3,A:{id:"t_s4a",name:"Russian twists — ben sammen + kryss",sets:"3×7-7-7"},B:{id:"t_s4b",name:"YTW med vekter på benk",sets:"3×7-7-7"}},
+  ]},
+  {id:"thu",short:"TOR",name:"Torsdag",title:"Underkropp 2",warmup:"Sykle 10 min + Romaskin 5 min",blocks:[
+    {type:"ss",id:"th_s0",rest:90,dSets:3,A:{id:"th_s0a",name:"Deadbug pilatesball m/vekter — varierte benretn.",sets:"3×12"},B:{id:"th_s0b",name:"Rygghev i stativ — vekter mot nakke",sets:"3×12"}},
+    {type:"ex",id:"th_1",name:"Bootybuilder",sets:"4×6",rest:90,dSets:4},
+    {type:"ex",id:"th_2",name:"Trapbar markløft (knebøy etter hvert?)",sets:"4×6",rest:120,dSets:4},
+    {type:"ex",id:"th_3",name:"Bulgarsk utfall med vekt(er) — start motsatt",sets:"3×8/side",rest:90,dSets:3},
+    {type:"ex",id:"th_4",name:"RDL (rumpa bak)",sets:"3×8",rest:90,dSets:3},
+    {type:"ex",id:"th_5",name:"Liggende hamstring curls",sets:"3×10",rest:90,dSets:3},
+    {type:"ex",id:"th_6",name:"Sittende tåhev i apparat (bøyde knær)",sets:"3×12",rest:90,dSets:3},
+  ]},
+  {id:"fri",short:"FRE",name:"Fredag",title:"Overkropp 2",warmup:"Generell oppvarming inkl. rehabøvelser bicep + skulder",blocks:[
+    {type:"ss",id:"f_s0",rest:90,dSets:3,A:{id:"f_s0a",name:"Benkpress",sets:"3×10"},B:{id:"f_s0b",name:"Pullups",sets:"3×maks"}},
+    {type:"ss",id:"f_s1",rest:90,dSets:3,A:{id:"f_s1a",name:"Incline brystpress med manualer (30–45°)",sets:"3×10"},B:{id:"f_s1b",name:"Stående roing med stang",sets:"3×10"}},
+    {type:"ss",id:"f_s2",rest:90,dSets:3,A:{id:"f_s2a",name:"Militærpress med stang",sets:"3×10"},B:{id:"f_s2b",name:"Lateral raises",sets:"3×12–15"}},
+    {type:"ss",id:"f_s3",rest:90,dSets:3,A:{id:"f_s3a",name:"Landmine press",sets:"3×8"},B:{id:"f_s3b",name:"Landmine row",sets:"3×8"}},
+    {type:"ss",id:"f_s4",rest:90,dSets:3,A:{id:"f_s4a",name:"Stående bicep curls i kabler",sets:"3×12"},B:{id:"f_s4b",name:"Tricep «innkast» (OHP) med tau",sets:"3×12"}},
+    {type:"ss",id:"f_s5",rest:90,dSets:3,A:{id:"f_s5a",name:"Sideplanke hoftedrop med vekt",sets:"3×10/side"},B:{id:"f_s5b",name:"Stir the pot på tær",sets:"3×7/side"}},
+  ]},
+];
+
+const ARM_REHAB = [
+  {name:"Bicep curl — ikke for langt opp, stopp rett før strak arm",sets:"3×8 · 3 sek opp/ned"},
+  {name:"Innadrotasjon albue med stang — støtte under albuen",sets:"3×8 · 3 sek opp/ned"},
+  {name:"Sidesittende sidehev med vekt — finn ubehaget i senen",sets:"3×8 · 3 sek opp/ned"},
+  {name:"Sideliggende utadrotasjon med vekt — albue oppå kroppen",sets:"3×8 · 3 sek opp/ned"},
+];
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let S = { dayIdx:0, week:1, totalWeeks:8, data:{}, expanded:{}, days:null, timer:null, timerInt:null, newExType:'ex', userId:null, saveTimeout:null };
+
+// ── SYNC STATUS ──────────────────────────────────────────────────────────────
+function setSyncStatus(state, text) {
+  const bar = document.getElementById('sync-bar');
+  const el  = document.getElementById('sync-status');
+  bar.className = 'visible ' + state;
+  el.textContent = { saving:'↑ Lagrer...', saved:'✓ Synkronisert', error:'✗ Feil ved lagring', '':'' }[state] || text || '';
+}
+
+// ── SUPABASE SAVE/LOAD ───────────────────────────────────────────────────────
+async function cloudSave() {
+  if (!S.userId) return;
+  setSyncStatus('saving');
+  const payload = { data:S.data, expanded:S.expanded, days:S.days, totalWeeks:S.totalWeeks, week:S.week, dayIdx:S.dayIdx };
+  const { error } = await sb.from('gym_data').upsert({ id: S.userId, payload, updated_at: new Date().toISOString() });
+  if (error) { console.error(error); setSyncStatus('error'); }
+  else setSyncStatus('saved');
+}
+
+function scheduleSave() {
+  clearTimeout(S.saveTimeout);
+  S.saveTimeout = setTimeout(cloudSave, 800);
+}
+
+async function cloudLoad(userId) {
+  const { data, error } = await sb.from('gym_data').select('payload').eq('id', userId).single();
+  if (error || !data) return;
+  const p = data.payload;
+  S.data        = p.data        || {};
+  S.expanded    = p.expanded    || {};
+  S.days        = p.days        || null;
+  S.totalWeeks  = p.totalWeeks  || 8;
+  S.week        = p.week        || 1;
+  S.dayIdx      = p.dayIdx      || 0;
+}
+
+// ── AUTH HELPERS ─────────────────────────────────────────────────────────────
+function showLogin()  { document.getElementById('auth-mode-login').style.display=''; document.getElementById('auth-mode-signup').style.display='none'; }
+function showSignup() { document.getElementById('auth-mode-login').style.display='none'; document.getElementById('auth-mode-signup').style.display=''; }
+
+async function doLogin() {
+  const email = document.getElementById('auth-email').value.trim();
+  const pass  = document.getElementById('auth-password').value;
+  const btn   = document.getElementById('auth-login-btn');
+  const err   = document.getElementById('auth-err');
+  err.textContent = '';
+  if (!email || !pass) { err.textContent = 'Fyll inn e-post og passord.'; return; }
+  btn.disabled = true; btn.textContent = 'Logger inn…';
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  btn.disabled = false; btn.textContent = 'Logg inn';
+  if (error) err.textContent = error.message === 'Invalid login credentials' ? 'Feil e-post eller passord.' : error.message;
+}
+
+async function doSignup() {
+  const email = document.getElementById('signup-email').value.trim();
+  const pass  = document.getElementById('signup-password').value;
+  const pass2 = document.getElementById('signup-password2').value;
+  const btn   = document.getElementById('auth-signup-btn');
+  const err   = document.getElementById('signup-err');
+  const ok    = document.getElementById('signup-ok');
+  err.textContent = ''; ok.textContent = '';
+  if (!email || !pass) { err.textContent = 'Fyll inn e-post og passord.'; return; }
+  if (pass !== pass2)  { err.textContent = 'Passordene stemmer ikke overens.'; return; }
+  if (pass.length < 6) { err.textContent = 'Passordet må være minst 6 tegn.'; return; }
+  btn.disabled = true; btn.textContent = 'Oppretter…';
+  const { error } = await sb.auth.signUp({ email, password: pass });
+  btn.disabled = false; btn.textContent = 'Opprett konto';
+  if (error) err.textContent = error.message;
+  else ok.textContent = 'Konto opprettet! Sjekk e-posten din for bekreftelse, deretter logg inn.';
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  S = { dayIdx:0, week:1, totalWeeks:8, data:{}, expanded:{}, days:null, timer:null, timerInt:null, newExType:'ex', userId:null, saveTimeout:null };
+  document.getElementById('main-app').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+}
+
+// ── SESSION LISTENER ─────────────────────────────────────────────────────────
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (session?.user) {
+    S.userId = session.user.id;
+    document.getElementById('sync-user-label').textContent = session.user.email;
+    await cloudLoad(S.userId);
+    if (!S.days) S.days = JSON.parse(JSON.stringify(DEFAULT_DAYS));
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = '';
+    setSyncStatus('saved');
+    render();
+  }
+});
+
+// ── KEYS / HELPERS ───────────────────────────────────────────────────────────
+const K = {
+  w:   (id,wk,si) => `${id}|w${wk}|s${si}`,
+  fb:  (id,wk,si) => `${id}|w${wk}|s${si}|fb`,
+  nt:  (id,wk)    => `${id}|w${wk}|notes`,
+  cnt: (id,wk)    => `${id}|w${wk}|count`,
+};
+const FB = { up:{lbl:"↑",cls:"up"}, same:{lbl:"→",cls:"same"}, down:{lbl:"↓",cls:"down"} };
+const fmtT = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+const fmtR = s => s >= 120 ? "2 min" : "90 sek";
+
+function getCount(id, wk, def) { const v = S.data[K.cnt(id,wk)]; return v !== undefined ? parseInt(v) : (def||3); }
+function hasFilled(id, wk, def) { const cnt=getCount(id,wk,def); for(let i=0;i<cnt;i++) if(S.data[K.w(id,wk,i)]) return true; return false; }
+function getDominantFb(id, wk, def) {
+  if (wk < 2) return '';
+  const cnt = getCount(id, wk-1, def);
+  let best='', bestN=0;
+  for (const f of ['up','same','down']) {
+    const n = Array.from({length:cnt},(_,i)=>i).filter(i => S.data[K.fb(id,wk-1,i)]===f).length;
+    if (n > bestN) { bestN=n; best=f; }
+  }
+  return best;
+}
+
+// ── TIMER ────────────────────────────────────────────────────────────────────
+function startTimer(secs) {
+  clearInterval(S.timerInt);
+  S.timer = secs;
+  const box = document.getElementById('float-timer');
+  box.style.display = 'flex';
+  updateTimerDisplay();
+  S.timerInt = setInterval(() => {
+    S.timer--;
+    if (S.timer <= 0) { clearInterval(S.timerInt); S.timer=null; box.style.display='none'; return; }
+    updateTimerDisplay();
+  }, 1000);
+}
+function updateTimerDisplay() {
+  const d = document.getElementById('timer-digits');
+  if (!d) return;
+  d.textContent = fmtT(S.timer);
+  d.className = 'timer-digits' + (S.timer <= 10 ? ' urgent' : '');
+}
+function skipTimer() { clearInterval(S.timerInt); S.timer=null; document.getElementById('float-timer').style.display='none'; }
+
+// ── BUILD FUNCTIONS ──────────────────────────────────────────────────────────
+function buildSetRows(ex, wk, def) {
+  const cnt = getCount(ex.id, wk, def);
+  let html = '';
+  for (let i=0; i<cnt; i++) {
+    const wVal  = S.data[K.w(ex.id,wk,i)] || '';
+    const fbVal = S.data[K.fb(ex.id,wk,i)] || '';
+    const prevW  = wk>1 ? (S.data[K.w(ex.id,wk-1,i)]||'') : '';
+    const prevFb = wk>1 ? (S.data[K.fb(ex.id,wk-1,i)]||'') : '';
+    const prevLine = prevW
+      ? `<div class="prev-hint ${prevFb||'none'}">${prevFb ? FB[prevFb].lbl+' ' : ''}${prevW} kg forrige uke</div>`
+      : '';
+    html += `<div class="set-row" id="sr_${ex.id}_${wk}_${i}">
+      <div class="set-num">${i+1}</div>
+      <div class="weight-ctrl${wVal?' filled':''}" id="wc_${ex.id}_${wk}_${i}">
+        <button class="step-btn" onclick="stepW('${ex.id}',${wk},${i},-2.5)">−</button>
+        <div class="weight-input-wrap">
+          ${prevLine}
+          <input class="w-input" type="number" inputmode="decimal" placeholder="—" value="${wVal}"
+            onchange="setW('${ex.id}',${wk},${i},this.value)" onfocus="this.select()">
+        </div>
+        <span class="w-unit">kg</span>
+        <button class="step-btn" onclick="stepW('${ex.id}',${wk},${i},2.5)">+</button>
+      </div>
+      ${Object.entries(FB).map(([k,cfg]) =>
+        `<button class="fb-btn${fbVal===k?' act-'+cfg.cls:''}" onclick="setFb('${ex.id}',${wk},${i},'${k}')">${cfg.lbl}</button>`
+      ).join('')}
+      ${cnt>1 ? `<button class="del-set-btn" onclick="delSet('${ex.id}',${wk},${def})">×</button>` : ''}
+    </div>`;
+  }
+  return html;
+}
+
+function buildExBody(ex, wk, def) {
+  const note = S.data[K.nt(ex.id,wk)] || '';
+  return `<div class="ex-body">
+    ${buildSetRows(ex, wk, def)}
+    <button class="add-set-btn" onclick="addSet('${ex.id}',${wk},${def})">+ Legg til sett</button>
+    <textarea class="notes-area" placeholder="Notater til øvelsen…" oninput="setNote('${ex.id}',${wk},this.value)">${note}</textarea>
+    <div style="overflow:hidden">
+      <button class="timer-btn" onclick="startTimer(${ex.rest||90})">⏱ ${fmtR(ex.rest||90)} pause ▶</button>
+    </div>
+    <div style="clear:both;height:4px"></div>
+  </div>`;
+}
+
+function buildExCard(ex, wk, def, ssLetter) {
+  const exp = !!S.expanded['ex_'+ex.id];
+  const cnt = getCount(ex.id, wk, def);
+  const filled = Array.from({length:cnt},(_,i)=>i).filter(i=>S.data[K.w(ex.id,wk,i)]).length;
+  const dom = getDominantFb(ex.id, wk, def);
+  return `<div class="ex-card">
+    <div class="ex-header" onclick="toggleEx('${ex.id}')">
+      ${ssLetter ? `<div class="ss-letter">${ssLetter}</div>` : ''}
+      <div style="flex:1;min-width:0">
+        <div class="ex-name">${ex.name}</div>
+        <div class="ex-meta-row">
+          <span class="ex-sets-badge">${ex.sets}</span>
+          ${filled>0 ? `<span class="filled-chip">${filled}/${cnt} sett</span>` : ''}
+          ${dom ? `<span class="fb-hint-chip ${dom}">${FB[dom].lbl} forrige uke</span>` : ''}
+        </div>
+      </div>
+      <span class="chevron${exp?' open':''}">▶</span>
+    </div>
+    ${exp ? buildExBody(ex, wk, def) : ''}
+  </div>`;
+}
+
+function buildSSBlock(block, wk) {
+  const exp = !!S.expanded['ss_'+block.id];
+  const cntA = getCount(block.A.id, wk, block.dSets);
+  const cntB = getCount(block.B.id, wk, block.dSets);
+  const fA = Array.from({length:cntA},(_,i)=>i).filter(i=>S.data[K.w(block.A.id,wk,i)]).length;
+  const fB = Array.from({length:cntB},(_,i)=>i).filter(i=>S.data[K.w(block.B.id,wk,i)]).length;
+  const dA = getDominantFb(block.A.id, wk, block.dSets);
+  const dB = getDominantFb(block.B.id, wk, block.dSets);
+  return `<div class="ss-wrapper">
+    <div class="ss-top-bar" onclick="toggleSS('${block.id}')">
+      <div class="ss-badge">SUPERSETT</div>
+      ${fA+fB>0 ? `<span class="filled-chip">${fA+fB}/${cntA+cntB} sett</span>` : ''}
+      ${dA||dB ? `<span class="fb-hint-chip ${dA||dB}" style="font-size:10px">A:${dA?FB[dA].lbl:'—'} B:${dB?FB[dB].lbl:'—'} forrige</span>` : ''}
+      <span class="chevron${exp?' open':''}" style="margin-left:auto">▶</span>
+    </div>
+    ${exp ? `
+      <div style="padding:8px 12px 0">
+        ${buildExCard(block.A, wk, block.dSets, 'A')}
+        <div class="ss-divider">↓ DERETTER ↓</div>
+        ${buildExCard(block.B, wk, block.dSets, 'B')}
+      </div>
+      <div class="ss-rest-row">
+        <button class="timer-btn" style="float:none;margin-top:0" onclick="startTimer(${block.rest})">⏱ ${fmtR(block.rest)} pause ▶</button>
+      </div>
+    ` : ''}
+  </div>`;
+}
+
+function getAllExIds(day) {
+  return day.blocks.flatMap(b => b.type==='ss' ? [{id:b.A.id,def:b.dSets},{id:b.B.id,def:b.dSets}] : [{id:b.id,def:b.dSets}]);
+}
+
+// ── MAIN RENDER ──────────────────────────────────────────────────────────────
+function render() {
+  const day = S.days[S.dayIdx];
+  const wk  = S.week;
+  document.getElementById('wk-label').textContent = wk;
+
+  document.getElementById('day-tabs').innerHTML = S.days.map((d,i) =>
+    `<button class="day-tab${S.dayIdx===i?' active':''}" onclick="setDay(${i})">${d.short}<small>${d.title}</small></button>`
+  ).join('');
+
+  const wkBtns = Array.from({length:S.totalWeeks},(_,i)=>i+1).map(w => {
+    const isAct = w===wk;
+    const hasDat = S.days.some(d => getAllExIds(d).some(({id,def}) => hasFilled(id,w,def)));
+    return `<button class="wk-btn${isAct?' active':hasDat?' has-data':''}" onclick="setWeek(${w})">${w}</button>`;
+  }).join('');
+  document.getElementById('week-row').innerHTML = wkBtns +
+    `<button class="add-week-btn" onclick="addWeeks()">+ 4 uker</button>`;
+
+  const allExIds = getAllExIds(day);
+  const filled = allExIds.filter(({id,def}) => hasFilled(id,wk,def)).length;
+  const pct = allExIds.length ? (filled/allExIds.length)*100 : 0;
+  const isDone = filled===allExIds.length && allExIds.length>0;
+
+  document.getElementById('content').innerHTML = `
+    <div class="day-header">
+      <div><div class="day-name">${day.name}</div><div class="day-sub">${day.title}</div></div>
+      <div>
+        <div class="prog-count" style="color:${isDone?'#22C97A':'#F0F0F5'}">${filled}/${allExIds.length}</div>
+        <div class="prog-sub">øvelser uke ${wk}</div>
+      </div>
+    </div>
+    <div class="prog-bar-wrap"><div class="prog-bar${isDone?' done':''}" style="width:${Math.round(pct)}%"></div></div>
+
+    <div class="sec-label">Oppvarming</div>
+    <div class="warmup-card">🟢 ${day.warmup}</div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 8px;align-items:center">
+      <div style="display:flex;gap:5px;align-items:center"><div style="width:7px;height:7px;border-radius:50%;background:#22C97A"></div><span style="font-size:11px;color:#404048">↑ Øk vekt</span></div>
+      <div style="display:flex;gap:5px;align-items:center"><div style="width:7px;height:7px;border-radius:50%;background:#E8B84B"></div><span style="font-size:11px;color:#404048">→ Behold</span></div>
+      <div style="display:flex;gap:5px;align-items:center"><div style="width:7px;height:7px;border-radius:50%;background:#E24B4A"></div><span style="font-size:11px;color:#404048">↓ Reduser</span></div>
+    </div>
+
+    <div class="sec-label">Øvelser</div>
+    ${day.blocks.map(b => b.type==='ss' ? buildSSBlock(b,wk) : buildExCard(b,wk,b.dSets,null)).join('')}
+
+    <div class="sec-label" style="margin-top:20px">Armer — rehab (2 × uke)</div>
+    <div class="ex-card" style="padding:10px 12px">
+      ${ARM_REHAB.map(a=>`<div class="arm-item"><div class="arm-name">${a.name}</div><div class="arm-sets-txt">${a.sets}</div></div>`).join('')}
+    </div>
+
+    <div class="info-box">
+      <strong>+2 prinsippet:</strong> øk vekt gradvis — skal akkurat klare gitt antall reps<br>
+      <strong>Supersett:</strong> gjennomfør A og B back-to-back, deretter pause<br>
+      <strong>Pil per sett</strong> (↑→↓) vises automatisk fargekodet neste uke
+    </div>
+  `;
+}
+
+// ── ACTIONS ──────────────────────────────────────────────────────────────────
+function setDay(i)  { S.dayIdx=i; render(); scheduleSave(); }
+function setWeek(w) { S.week=w; render(); scheduleSave(); }
+function addWeeks() { S.totalWeeks+=4; render(); scheduleSave(); }
+
+function toggleEx(id) { S.expanded['ex_'+id]=!S.expanded['ex_'+id]; scheduleSave(); render(); }
+function toggleSS(id) { S.expanded['ss_'+id]=!S.expanded['ss_'+id]; scheduleSave(); render(); }
+
+function setW(id, wk, si, v) {
+  const n = parseFloat(v);
+  S.data[K.w(id,wk,si)] = (!isNaN(n)&&n>=0) ? String(n) : '';
+  scheduleSave();
+  const ctrl = document.getElementById('wc_'+id+'_'+wk+'_'+si);
+  if (ctrl) ctrl.className = 'weight-ctrl' + (S.data[K.w(id,wk,si)]?' filled':'');
+}
+function stepW(id, wk, si, d) {
+  const cur = parseFloat(S.data[K.w(id,wk,si)]||0)||0;
+  const next = Math.max(0, Math.round((cur+d)*10)/10);
+  S.data[K.w(id,wk,si)] = String(next);
+  scheduleSave();
+  const inp = document.querySelector(`#sr_${id}_${wk}_${si} .w-input`);
+  if (inp) inp.value = next;
+  const ctrl = document.getElementById('wc_'+id+'_'+wk+'_'+si);
+  if (ctrl) ctrl.className = 'weight-ctrl filled';
+}
+function setFb(id, wk, si, fb) {
+  const cur = S.data[K.fb(id,wk,si)]||'';
+  S.data[K.fb(id,wk,si)] = cur===fb ? '' : fb;
+  scheduleSave();
+  const row = document.getElementById('sr_'+id+'_'+wk+'_'+si);
+  if (!row) return;
+  const btns = row.querySelectorAll('.fb-btn');
+  const newFb = S.data[K.fb(id,wk,si)]||'';
+  Object.keys(FB).forEach((k,i) => { btns[i].className='fb-btn'+(newFb===k?' act-'+FB[k].cls:''); });
+}
+function setNote(id, wk, v) { S.data[K.nt(id,wk)]=v; scheduleSave(); }
+function addSet(id, wk, def) { S.data[K.cnt(id,wk)]=String(getCount(id,wk,def)+1); scheduleSave(); render(); }
+function delSet(id, wk, def) { const cnt=getCount(id,wk,def); if(cnt>1){S.data[K.cnt(id,wk)]=String(cnt-1);scheduleSave();render();} }
+
+// ── MODALS ───────────────────────────────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function setExType(t) {
+  S.newExType = t;
+  const s = document.getElementById('ex-type-single');
+  const ss = document.getElementById('ex-type-ss');
+  s.style.cssText  = t==='ex'  ? 'flex:1;background:#E8381A;border-color:#E8381A;color:#fff' : 'flex:1';
+  ss.style.cssText = t==='ss'  ? 'flex:1;background:#3B82F6;border-color:#3B82F6;color:#fff' : 'flex:1';
+  document.getElementById('ss-extra').style.display = t==='ss' ? 'block' : 'none';
+}
+function openAddExModal() {
+  ['new-ex-name','new-ex-sets','new-ex-name-b','new-ex-sets-b'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('new-ex-rest').value = '90';
+  setExType('ex');
+  openModal('modal-add-ex');
+}
+function uid() { return 'ex_'+Date.now()+'_'+Math.random().toString(36).slice(2,6); }
+function confirmAddEx() {
+  const name  = document.getElementById('new-ex-name').value.trim();
+  const sets  = document.getElementById('new-ex-sets').value.trim() || '3×10';
+  const rest  = parseInt(document.getElementById('new-ex-rest').value)||90;
+  if (!name) return;
+  if (S.newExType==='ss') {
+    const nameB = document.getElementById('new-ex-name-b').value.trim();
+    const setsB = document.getElementById('new-ex-sets-b').value.trim() || '3×10';
+    const id = uid();
+    S.days[S.dayIdx].blocks.push({type:'ss',id,rest,dSets:3,A:{id:id+'a',name,sets},B:{id:id+'b',name:nameB||'Øvelse B',sets:setsB}});
+  } else {
+    S.days[S.dayIdx].blocks.push({type:'ex',id:uid(),name,sets,rest,dSets:3});
+  }
+  closeModal('modal-add-ex');
+  scheduleSave();
+  render();
+}
+function openAddDayModal() {
+  ['new-day-name','new-day-short','new-day-title','new-day-warmup'].forEach(id => document.getElementById(id).value='');
+  openModal('modal-add-day');
+}
+function confirmAddDay() {
+  const name   = document.getElementById('new-day-name').value.trim();
+  const short  = document.getElementById('new-day-short').value.trim().toUpperCase() || name.slice(0,3).toUpperCase();
+  const title  = document.getElementById('new-day-title').value.trim() || name;
+  const warmup = document.getElementById('new-day-warmup').value.trim() || 'Generell oppvarming';
+  if (!name) return;
+  S.days.push({id:'day_'+uid(),short,name,title,warmup,blocks:[]});
+  closeModal('modal-add-day');
+  S.dayIdx = S.days.length-1;
+  scheduleSave();
+  render();
+}
+function openManageModal() {
+  const day = S.days[S.dayIdx];
+  document.getElementById('manage-days-list').innerHTML = S.days.map((d,i) =>
+    `<div class="modal-row">
+      <div class="modal-row-name">${d.name}<div class="modal-row-sub">${d.title}</div></div>
+      ${S.days.length>1 ? `<button class="edit-btn danger" onclick="removeDay(${i})">Slett</button>` : ''}
+    </div>`
+  ).join('');
+  document.getElementById('manage-day-label').textContent = day.name;
+  document.getElementById('manage-ex-list').innerHTML = day.blocks.map((b,i) => {
+    const label = b.type==='ss' ? `${b.A.name} / ${b.B.name}` : b.name;
+    return `<div class="modal-row">
+      <div style="flex:1"><div class="modal-row-name">${label}</div><div class="modal-row-sub">${b.type==='ss'?'Supersett':b.sets}</div></div>
+      <button class="edit-btn danger" onclick="removeBlock(${i})">Slett</button>
+    </div>`;
+  }).join('') || '<div style="color:#30303A;font-size:13px;padding:8px 0">Ingen øvelser enda</div>';
+  openModal('modal-manage');
+}
+function removeDay(i) {
+  if (!confirm(`Slette «${S.days[i].name}»?`)) return;
+  S.days.splice(i,1);
+  if (S.dayIdx>=S.days.length) S.dayIdx=S.days.length-1;
+  closeModal('modal-manage');
+  scheduleSave();
+  render();
+}
+function removeBlock(i) {
+  S.days[S.dayIdx].blocks.splice(i,1);
+  openManageModal();
+  scheduleSave();
+  render();
+}
+</script>
+</body>
+</html>
