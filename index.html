@@ -368,12 +368,18 @@ input[type=number]{-moz-appearance:textfield}
 <script>
 const SUPABASE_URL  = 'https://ubmneqtgvblgyirofleh.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVibW5lcXRndmJsZ3lpcm9mbGVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMDM1MjAsImV4cCI6MjA4OTg3OTUyMH0.Qz0D_XpLBCpcOjhVHk6E_dNUIch16ot4KkUVChU2YAg';
+// Safe storage that works on iOS Safari (private mode blocks localStorage)
+const safeStorage = {
+  getItem: k => { try { return localStorage.getItem(k); } catch(e) { return sessionStorage.getItem(k); } },
+  setItem: (k,v) => { try { localStorage.setItem(k,v); } catch(e) { sessionStorage.setItem(k,v); } },
+  removeItem: k => { try { localStorage.removeItem(k); } catch(e) { sessionStorage.removeItem(k); } }
+};
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: false,
-    storage: window.localStorage
+    storage: safeStorage
   }
 });
 
@@ -457,9 +463,16 @@ async function doLogin(){
   err.textContent='';
   if(!email||!pass){err.textContent='Fyll inn e-post og passord.';return;}
   btn.disabled=true;btn.textContent='Logger inn…';
-  const{error}=await sb.auth.signInWithPassword({email,password:pass});
-  btn.disabled=false;btn.textContent='Logg inn';
-  if(error)err.textContent=error.message==='Invalid login credentials'?'Feil e-post eller passord.':error.message;
+  try {
+    const timeout = new Promise((_,reject) => setTimeout(()=>reject(new Error('timeout')), 10000));
+    const login = sb.auth.signInWithPassword({email,password:pass});
+    const {error} = await Promise.race([login, timeout]);
+    btn.disabled=false;btn.textContent='Logg inn';
+    if(error)err.textContent=error.message==='Invalid login credentials'?'Feil e-post eller passord.':error.message;
+  } catch(e) {
+    btn.disabled=false;btn.textContent='Logg inn';
+    err.textContent = e.message==='timeout' ? 'Tidsavbrudd — sjekk internettforbindelsen og prøv igjen.' : e.message;
+  }
 }
 async function doSignup(){
   const email=document.getElementById('signup-email').value.trim();
