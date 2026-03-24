@@ -368,7 +368,14 @@ input[type=number]{-moz-appearance:textfield}
 <script>
 const SUPABASE_URL  = 'https://ubmneqtgvblgyirofleh.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVibW5lcXRndmJsZ3lpcm9mbGVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMDM1MjAsImV4cCI6MjA4OTg3OTUyMH0.Qz0D_XpLBCpcOjhVHk6E_dNUIch16ot4KkUVChU2YAg';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false,
+    storage: window.localStorage
+  }
+});
 
 const DEFAULT_DAYS = [
   {id:"mon",short:"MAN",name:"Mandag",title:"Underkropp 1",warmup:"Sykle 10 min + Romaskin 5 min",blocks:[
