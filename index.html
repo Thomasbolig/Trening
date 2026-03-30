@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0B0B12">
 <title>TH Treningsprogram</title>
@@ -210,6 +211,27 @@ input[type=number]{-moz-appearance:textfield}
 .reps-ctrl{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;background:#FFF8F0;border:1.5px solid #E8381A55;border-radius:10px;overflow:hidden;height:52px;width:120px;-webkit-flex-shrink:0;flex-shrink:0}
 .rep-step-btn{width:36px;height:52px;background:transparent;border:none;color:#E8381A;font-size:22px;cursor:pointer;display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;-webkit-justify-content:center;justify-content:center;-webkit-flex-shrink:0;flex-shrink:0;opacity:.9}
 .rep-input{-webkit-flex:1;flex:1;background:transparent;border:none;color:#1A1A22;font-size:18px;font-weight:700;text-align:center;outline:none;min-width:0;-webkit-appearance:none}
+
+/* SCROLL WHEEL INPUT */
+.scroll-input-wrap{position:relative;display:-webkit-flex;display:flex;-webkit-flex-direction:column;flex-direction:column;-webkit-align-items:center;align-items:center;-webkit-justify-content:center;justify-content:center;-webkit-flex:1;flex:1;height:52px;cursor:ns-resize;user-select:none;-webkit-user-select:none;touch-action:none}
+.scroll-val{font-size:20px;font-weight:700;color:#1A1A22;line-height:1;text-align:center;pointer-events:none}
+.scroll-val.prefilled{color:#CCCCCC}
+.scroll-unit{font-size:10px;color:#888898;font-weight:600;pointer-events:none}
+.scroll-hint{font-size:9px;color:#BBBBBB;pointer-events:none;line-height:1}
+.scroll-arrows{font-size:11px;color:#DDDDDD;line-height:1;pointer-events:none}
+
+/* SESSION BAR */
+.session-bar{display:-webkit-flex;display:flex;align-items:center;justify-content:space-between;background:#1A1A22;color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:12px;gap:10px}
+.session-timer{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:800;letter-spacing:2px;color:#E8381A;min-width:72px}
+.session-timer.done{color:#22C97A}
+.session-start-btn{background:#E8381A;border:none;color:#fff;padding:10px 20px;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap}
+.session-done-btn{background:#22C97A;border:none;color:#fff;padding:10px 20px;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap}
+.session-info{font-size:12px;color:#888;flex:1}
+.session-duration{font-size:12px;color:#22C97A;font-weight:600}
+
+/* LOCK OVERLAY on locked sessions */
+.locked-banner{background:#F0FBF5;border:1.5px solid #16A05A55;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:-webkit-flex;display:flex;align-items:center;gap:10px;font-size:13px;color:#1A5A30}
+.locked-banner strong{font-weight:700}
 </style>
 </head>
 <body>
@@ -527,6 +549,60 @@ async function cloudSave(){
   setSyncStatus(error?'error':'saved');
 }
 function scheduleSave(){clearTimeout(S.saveTimeout);S.saveTimeout=setTimeout(cloudSave,800);}
+
+// ── SESSION MANAGEMENT ────────────────────────────────────────────────────────
+let _sessionInterval=null;
+
+function sessionKey(dayId, wk){ return dayId+'|w'+wk; }
+
+function startSession(){
+  const day=S.days[S.dayIdx]; const wk=S.week;
+  S.data[K.sStart(day.id,wk)]=Date.now().toString();
+  delete S.data[K.sEnd(day.id,wk)];
+  delete S.data[K.sLocked(day.id,wk)];
+  scheduleSave();
+  startSessionTimer();
+  render();
+}
+
+function finishSession(){
+  const day=S.days[S.dayIdx]; const wk=S.week;
+  if(!S.data[K.sStart(day.id,wk)]) return;
+  S.data[K.sEnd(day.id,wk)]=Date.now().toString();
+  S.data[K.sLocked(day.id,wk)]='1';
+  scheduleSave();
+  clearInterval(_sessionInterval);
+  render();
+}
+
+function startSessionTimer(){
+  clearInterval(_sessionInterval);
+  _sessionInterval=setInterval(()=>{
+    const el=document.getElementById('session-clock');
+    if(!el){ clearInterval(_sessionInterval); return; }
+    const day=S.days[S.dayIdx]; const wk=S.week;
+    const start=parseInt(S.data[K.sStart(day.id,wk)]||0);
+    if(!start){ clearInterval(_sessionInterval); return; }
+    const elapsed=Math.floor((Date.now()-start)/1000);
+    el.textContent=fmtT(elapsed);
+  },1000);
+}
+
+function getSessionState(day, wk){
+  const start=S.data[K.sStart(day.id,wk)];
+  const end=S.data[K.sEnd(day.id,wk)];
+  const locked=S.data[K.sLocked(day.id,wk)];
+  if(!start) return {state:'idle'};
+  if(locked) return {state:'locked', start:parseInt(start), end:parseInt(end), dur:Math.floor((parseInt(end)-parseInt(start))/1000)};
+  return {state:'active', start:parseInt(start), elapsed:Math.floor((Date.now()-parseInt(start))/1000)};
+}
+
+function fmtDur(secs){
+  const h=Math.floor(secs/3600), m=Math.floor((secs%3600)/60), s=secs%60;
+  if(h>0) return h+'t '+m+'m';
+  return m+'m '+s+'s';
+}
+// ── END SESSION ───────────────────────────────────────────────────────────────
 async function cloudLoad(){
   const{data,error}=await sbSelect();
   if(error||!data)return;
@@ -579,6 +655,73 @@ async function doLogout(){
   document.getElementById('main-app').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
 }
+// ── SWIPE GESTURE ENGINE ─────────────────────────────────────────────────────
+const _sw={};
+function swipeStart(e,el){
+  const t=e.touches?e.touches[0]:e;
+  _sw.y=t.clientY; _sw.el=el; _sw.moved=false;
+  _sw.startVal=parseFloat(el.querySelector('[id$="_disp"]')?.textContent)||0;
+  e.preventDefault();
+}
+function swipeMove(e,el){
+  if(!_sw.el||_sw.el!==el) return;
+  const t=e.touches?e.touches[0]:e;
+  const dy=_sw.y-t.clientY; // positive = swiping up = increase
+  const step=parseFloat(el.dataset.step)||1;
+  const pxPerStep=20;
+  const delta=Math.round(dy/pxPerStep)*step;
+  if(Math.abs(dy)>4) _sw.moved=true;
+  const raw=_sw.startVal+delta;
+  const next=Math.max(0,Math.round(raw/step)*step);
+  const dispEl=el.querySelector('[id$="_disp"]');
+  if(dispEl){dispEl.textContent=next||'—';dispEl.classList.remove('prefilled');}
+  el.dataset.pending=String(next);
+  e.preventDefault();
+}
+function swipeEnd(e,el){
+  if(!_sw.el||_sw.el!==el){_sw.el=null;return;}
+  if(!_sw.moved){_sw.el=null;return;}
+  const id=el.dataset.exid, wk=parseInt(el.dataset.wk), si=parseInt(el.dataset.si), type=el.dataset.type;
+  const val=el.dataset.pending;
+  if(val!==undefined){
+    if(type==='w') setW(id,wk,si,val);
+    else setR(id,wk,si,val);
+    // After swipe, also auto-copy to later sets if they are still prefilled
+    autoCopyDown(id,wk,si,type,val,getDefSets(id,wk));
+  }
+  _sw.el=null; e.preventDefault();
+}
+function tapToEdit(inputId){
+  const inp=document.getElementById(inputId);
+  if(!inp) return;
+  inp.style.cssText='position:fixed;top:50%;left:50%;opacity:0;width:1px;height:1px';
+  inp.focus();
+  inp.select();
+}
+function getDefSets(id,wk){
+  // Find default sets for this exercise
+  for(const day of S.days){
+    for(const b of day.blocks){
+      if(b.type==='ss'){if(b.A.id===id||b.B.id===id)return b.dSets;}
+      else if(b.id===id) return b.dSets;
+    }
+  }
+  return 3;
+}
+function autoCopyDown(id,wk,si,type,val,def){
+  // If si===0 and subsequent sets have no own value, update their display
+  if(si!==0) return;
+  const cnt=getCount(id,wk,def);
+  for(let i=1;i<cnt;i++){
+    const ownVal=type==='w'?S.data[K.w(id,wk,i)]:S.data[K.r(id,wk,i)];
+    if(!ownVal){
+      const dispEl=document.getElementById((type==='w'?'wi_':'ri_')+id+'_'+wk+'_'+i+'_disp');
+      if(dispEl){dispEl.textContent=val||'—';dispEl.classList.add('prefilled');}
+    }
+  }
+}
+// ── END SWIPE ─────────────────────────────────────────────────────────────────
+
 function onInputFocus(inp, id, wk, si, type){
   // Remove prefilled styling when user focuses — they're about to edit
   inp.classList.remove('prefilled');
@@ -603,7 +746,7 @@ async function initApp(){
 })();
 
 // KEYS
-const K={w:(id,wk,si)=>`${id}|w${wk}|s${si}`,r:(id,wk,si)=>`${id}|w${wk}|s${si}|rep`,fb:(id,wk,si)=>`${id}|w${wk}|s${si}|fb`,nt:(id,wk)=>`${id}|w${wk}|notes`,cnt:(id,wk)=>`${id}|w${wk}|count`};
+const K={w:(id,wk,si)=>`${id}|w${wk}|s${si}`,r:(id,wk,si)=>`${id}|w${wk}|s${si}|rep`,fb:(id,wk,si)=>`${id}|w${wk}|s${si}|fb`,nt:(id,wk)=>`${id}|w${wk}|notes`,cnt:(id,wk)=>`${id}|w${wk}|count`,sStart:(d,wk)=>`session|${d}|w${wk}|start`,sEnd:(d,wk)=>`session|${d}|w${wk}|end`,sLocked:(d,wk)=>`session|${d}|w${wk}|locked`};
 const FB={up:{lbl:"↑",cls:"up"},same:{lbl:"→",cls:"same"},down:{lbl:"↓",cls:"down"}};
 const fmtT=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
 const fmtR=s=>s>=120?"2 min":"90 sek";
@@ -640,8 +783,43 @@ function updateTimerDisplay(){const d=document.getElementById('timer-digits');if
 function skipTimer(){clearInterval(S.timerInt);S.timer=null;document.getElementById('float-timer').style.display='none';}
 
 // BUILD FUNCTIONS
+function getFirstSetVals(ex, wk, def){
+  // Returns {w, r} from set 0 this week if filled, else prev week set 0
+  const w0 = S.data[K.w(ex.id,wk,0)]||'';
+  const r0 = S.data[K.r(ex.id,wk,0)]||'';
+  if(w0||r0) return {w:w0,r:r0};
+  if(wk>1) return {w:S.data[K.w(ex.id,wk-1,0)]||'', r:S.data[K.r(ex.id,wk-1,0)]||''};
+  return {w:'',r:''};
+}
+
+function buildScrollCtrl(id, wk, si, type, dispVal, isPrefilled, step, unit){
+  const cls = type==='w' ? 'weight-ctrl'+(dispVal&&!isPrefilled?' filled':'') : 'reps-ctrl';
+  const inputId = (type==='w'?'wi_':'ri_')+id+'_'+wk+'_'+si;
+  const ctrlId  = (type==='w'?'wc_':'rc_')+id+'_'+wk+'_'+si;
+  const hint    = type==='w' ? '↕ dra' : '↕ dra';
+  return `<div class="${cls}" id="${ctrlId}"
+    data-exid="${id}" data-wk="${wk}" data-si="${si}" data-type="${type}" data-step="${step}"
+    data-prefilled="${isPrefilled?'1':'0'}"
+    ontouchstart="swipeStart(event,this)" ontouchmove="swipeMove(event,this)" ontouchend="swipeEnd(event,this)"
+    onmousedown="swipeStart(event,this)" onmousemove="swipeMove(event,this)" onmouseup="swipeEnd(event,this)"
+    style="cursor:ns-resize;-webkit-flex:${type==='w'?'1':'0 0 108px'};flex:${type==='w'?'1':'0 0 108px'}">
+    <div class="scroll-input-wrap" onclick="tapToEdit('${inputId}')">
+      <div class="scroll-arrows">▲</div>
+      <div class="scroll-val${isPrefilled?' prefilled':''}" id="${inputId}_disp">${dispVal||'—'}</div>
+      <div class="scroll-unit">${unit}${dispVal?'':' '+hint}</div>
+      <div class="scroll-arrows">▼</div>
+      <input type="number" inputmode="decimal" id="${inputId}"
+        value="${dispVal}" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none"
+        onchange="${type==='w'?'setW':'setR'}('${id}',${wk},${si},this.value)">
+    </div>
+  </div>`;
+}
+
 function buildSetRows(ex,wk,def){
-  const cnt=getCount(ex.id,wk,def);let html='';
+  const cnt=getCount(ex.id,wk,def);
+  let html='';
+  const first=getFirstSetVals(ex,wk,def);
+
   for(let i=0;i<cnt;i++){
     const wVal=S.data[K.w(ex.id,wk,i)]||'';
     const rVal=S.data[K.r(ex.id,wk,i)]||'';
@@ -650,46 +828,32 @@ function buildSetRows(ex,wk,def){
     const prevR=wk>1?(S.data[K.r(ex.id,wk-1,i)]||''):'';
     const prevFb=wk>1?(S.data[K.fb(ex.id,wk-1,i)]||''):'';
 
-    // Pre-fill from prev week if nothing logged this week
-    const dispW = wVal || prevW;
-    const dispR = rVal || prevR;
-    const wPrefilled = !wVal && !!prevW;
-    const rPrefilled = !rVal && !!prevR;
-    const isFilled = !!wVal;
+    // Auto-fill: use own value, else copy set-0 of this week (gray), else prev week same set
+    let dispW=wVal, wPre=false;
+    let dispR=rVal, rPre=false;
+    if(!wVal){
+      if(i>0 && first.w){dispW=first.w;wPre=true;}
+      else if(prevW){dispW=prevW;wPre=true;}
+    }
+    if(!rVal){
+      if(i>0 && first.r){dispR=first.r;rPre=true;}
+      else if(prevR){dispR=prevR;rPre=true;}
+    }
 
-    const prevFbLine = (prevW||prevR)
+    const prevFbLine=(prevW||prevR)
       ? `<div class="prev-hint ${prevFb||'none'}" style="font-size:9px;opacity:.65">${prevFb?FB[prevFb].lbl+' ':''}${prevW?prevW+'kg':''}${prevW&&prevR?' × ':''}${prevR?prevR+'r':''}</div>`
       : '';
 
     html+=`<div class="set-row" id="sr_${ex.id}_${wk}_${i}">
       <div class="set-row-top">
         <div class="set-num">${i+1}</div>
-        <div class="weight-ctrl${isFilled?' filled':''}" id="wc_${ex.id}_${wk}_${i}">
-          <button class="step-btn" onclick="stepW('${ex.id}',${wk},${i},-2.5)">−</button>
-          <div class="weight-input-wrap">
-            ${prevFbLine}
-            <input class="w-input${wPrefilled?' prefilled':''}" type="number" inputmode="decimal"
-              placeholder="—" value="${dispW}"
-              onchange="setW('${ex.id}',${wk},${i},this.value)"
-              onfocus="onInputFocus(this,'${ex.id}',${wk},${i},'w')"
-              id="wi_${ex.id}_${wk}_${i}">
-          </div>
-          <span class="w-unit">kg</span>
-          <button class="step-btn" onclick="stepW('${ex.id}',${wk},${i},2.5)">+</button>
-        </div>
-        <div class="reps-ctrl" id="rc_${ex.id}_${wk}_${i}">
-          <button class="rep-step-btn" onclick="stepR('${ex.id}',${wk},${i},-1)">−</button>
-          <input class="rep-input${rPrefilled?' prefilled':''}" type="number" inputmode="numeric"
-            placeholder="rep" value="${dispR}"
-            onchange="setR('${ex.id}',${wk},${i},this.value)"
-            onfocus="onInputFocus(this,'${ex.id}',${wk},${i},'r')"
-            id="ri_${ex.id}_${wk}_${i}">
-          <button class="rep-step-btn" onclick="stepR('${ex.id}',${wk},${i},1)">+</button>
-        </div>
+        ${buildScrollCtrl(ex.id,wk,i,'w',dispW,wPre,2.5,'kg')}
+        ${buildScrollCtrl(ex.id,wk,i,'r',dispR,rPre,1,'rep')}
       </div>
       <div class="set-row-bottom">
+        ${prevFbLine ? `<div style="flex:1;padding-left:4px">${prevFbLine}</div>` : '<div style="flex:1"></div>'}
         ${Object.entries(FB).map(([k,cfg])=>`<button class="fb-btn${fbVal===k?' act-'+cfg.cls:''}" title="${cfg.cls==='up'?'Øk vekt neste gang':cfg.cls==='same'?'Behold vekten':'Reduser vekten'}" onclick="setFb('${ex.id}',${wk},${i},'${k}')">${cfg.lbl}</button>`).join('')}
-        ${cnt>1?`<button class="del-set-btn" onclick="delSet('${ex.id}',${wk},${def})">×</button>`:'<div style="width:44px"></div>'}
+        ${cnt>1?`<button class="del-set-btn" onclick="delSet('${ex.id}',${wk},${def})">×</button>`:''}
       </div>
     </div>`;
   }
@@ -784,7 +948,42 @@ function render(){
   const filled=allExIds.filter(({id,def})=>hasFilled(id,wk,def)).length;
   const pct=allExIds.length?(filled/allExIds.length)*100:0;
   const isDone=filled===allExIds.length&&allExIds.length>0;
+  const sess=getSessionState(day,wk);
+  const sessionHTML=(()=>{
+    if(sess.state==='idle') return `
+      <div class="session-bar">
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600">Klar til å trene?</div>
+          <div class="session-info">Start økten for å ta tiden</div>
+        </div>
+        <button class="session-start-btn" onclick="startSession()">▶ Start økt</button>
+      </div>`;
+    if(sess.state==='active') return `
+      <div class="session-bar">
+        <div>
+          <div class="session-info" style="color:#aaa">Økt pågår</div>
+          <div class="session-timer" id="session-clock">${fmtT(sess.elapsed)}</div>
+        </div>
+        <div style="flex:1"></div>
+        <button class="session-done-btn" onclick="finishSession()">✓ Ferdig</button>
+      </div>`;
+    const dateStr=new Date(sess.end).toLocaleDateString('no-NO',{day:'numeric',month:'short'});
+    return `
+      <div class="locked-banner">
+        <span style="font-size:20px">🔒</span>
+        <div>
+          <strong>Økt fullført</strong> — ${dateStr}
+          <div class="session-duration">⏱ Varighet: ${fmtDur(sess.dur)}</div>
+        </div>
+        <button onclick="unlockSession()" style="margin-left:auto;background:transparent;border:1px solid #ccc;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;color:#666">Lås opp</button>
+      </div>`;
+  })();
+
+  // Re-start timer if session is active
+  if(sess.state==='active') setTimeout(startSessionTimer, 50);
+
   document.getElementById('content').innerHTML=`
+    ${sessionHTML}
     <div class="day-header">
       <div><div class="day-name">${day.name}</div><div class="day-sub">${day.title}</div></div>
       <div><div class="prog-count" style="color:${isDone?'#16A05A':'#1A1A22'}">${filled}/${allExIds.length}</div><div class="prog-sub">øvelser uke ${wk}</div></div>
@@ -812,7 +1011,25 @@ function render(){
 }
 
 // ACTIONS
-function setDay(i){S.dayIdx=i;render();scheduleSave();}
+function getNextWeekForDay(dayId){
+  // Find the first week that has no locked session for this day
+  for(let w=1; w<=S.totalWeeks; w++){
+    if(!S.data[K.sLocked(dayId, w)]) return w;
+  }
+  // All locked — add a new batch and return next
+  S.totalWeeks += 4;
+  scheduleSave();
+  return S.totalWeeks - 3;
+}
+
+function setDay(i){
+  S.dayIdx=i;
+  // Auto-jump to the first unlocked week for this day
+  const dayId=S.days[i].id;
+  S.week=getNextWeekForDay(dayId);
+  render();
+  scheduleSave();
+}
 function setWeek(w){S.week=w;render();scheduleSave();}
 function addWeeks(){S.totalWeeks+=4;render();scheduleSave();}
 function toggleEx(id){S.expanded['ex_'+id]=!S.expanded['ex_'+id];scheduleSave();render();}
@@ -824,39 +1041,22 @@ function setW(id,wk,si,v){
   scheduleSave();
   const c=document.getElementById('wc_'+id+'_'+wk+'_'+si);
   if(c)c.className='weight-ctrl'+(val?' filled':'');
-  const inp=document.getElementById('wi_'+id+'_'+wk+'_'+si);
-  if(inp)inp.classList.remove('prefilled');
+  const disp=document.getElementById('wi_'+id+'_'+wk+'_'+si+'_disp');
+  if(disp){disp.textContent=val||'—';disp.classList.remove('prefilled');}
+  // auto-copy to later sets if they have no own value
+  autoCopyDown(id,wk,si,'w',val,getDefSets(id,wk));
 }
-function stepW(id,wk,si,d){
-  const inp=document.getElementById('wi_'+id+'_'+wk+'_'+si);
-  const base=S.data[K.w(id,wk,si)]
-    ? parseFloat(S.data[K.w(id,wk,si)])
-    : (inp?parseFloat(inp.value)||0:0);
-  const next=Math.max(0,Math.round((base+d)*10)/10);
-  S.data[K.w(id,wk,si)]=String(next);
-  scheduleSave();
-  if(inp){inp.value=next;inp.classList.remove('prefilled');}
-  const c=document.getElementById('wc_'+id+'_'+wk+'_'+si);
-  if(c)c.className='weight-ctrl filled';
-}
+// stepW removed - using swipe
 function setR(id,wk,si,v){
   const n=parseInt(v);
   const val=(!isNaN(n)&&n>0)?String(n):'';
   S.data[K.r(id,wk,si)]=val;
   scheduleSave();
-  const inp=document.getElementById('ri_'+id+'_'+wk+'_'+si);
-  if(inp)inp.classList.remove('prefilled');
+  const disp=document.getElementById('ri_'+id+'_'+wk+'_'+si+'_disp');
+  if(disp){disp.textContent=val||'—';disp.classList.remove('prefilled');}
+  autoCopyDown(id,wk,si,'r',val,getDefSets(id,wk));
 }
-function stepR(id,wk,si,d){
-  const inp=document.getElementById('ri_'+id+'_'+wk+'_'+si);
-  const base=S.data[K.r(id,wk,si)]
-    ? parseInt(S.data[K.r(id,wk,si)])
-    : (inp?parseInt(inp.value)||0:0);
-  const next=Math.max(0,base+d);
-  S.data[K.r(id,wk,si)]=String(next);
-  scheduleSave();
-  if(inp){inp.value=next||'';inp.classList.remove('prefilled');}
-}
+// stepR removed - using swipe
 function setFb(id,wk,si,fb){const cur=S.data[K.fb(id,wk,si)]||'';S.data[K.fb(id,wk,si)]=cur===fb?'':fb;scheduleSave();const row=document.getElementById('sr_'+id+'_'+wk+'_'+si);if(!row)return;const btns=row.querySelectorAll('.fb-btn');const nf=S.data[K.fb(id,wk,si)]||'';Object.keys(FB).forEach((k,i)=>{btns[i].className='fb-btn'+(nf===k?' act-'+FB[k].cls:'');});}
 function setNote(id,wk,v){S.data[K.nt(id,wk)]=v;scheduleSave();}
 function addSet(id,wk,def){S.data[K.cnt(id,wk)]=String(getCount(id,wk,def)+1);scheduleSave();render();}
@@ -901,6 +1101,11 @@ function openManageModal(){
   openModal('modal-manage');
 }
 function removeDay(i){if(!confirm(`Slette «${S.days[i].name}»?`))return;S.days.splice(i,1);if(S.dayIdx>=S.days.length)S.dayIdx=S.days.length-1;closeModal('modal-manage');scheduleSave();render();}
+function unlockSession(){
+  const day=S.days[S.dayIdx]; const wk=S.week;
+  delete S.data[K.sLocked(day.id,wk)];
+  scheduleSave(); render();
+}
 function removeBlock(i){S.days[S.dayIdx].blocks.splice(i,1);openManageModal();scheduleSave();render();}
 
 // CHART MODAL
