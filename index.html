@@ -41,8 +41,10 @@ break;case"<bookViews":;case"<bookViews>":;case"</bookViews>":break;case"<workbo
       <button id="picker-confirm" onclick="confirmPicker()">OK</button>
     </div>
     <div id="picker-drum-wrap">
+      <div id="picker-fade-top"></div>
       <div id="picker-selection-line"></div>
       <div id="picker-drum"></div>
+      <div id="picker-fade-bottom"></div>
     </div>
   </div>
 </div>
@@ -249,19 +251,22 @@ input[type=number]{-moz-appearance:textfield}
 .locked-banner strong{font-weight:700}
 
 /* ── PICKER WHEEL ────────────────────────────────────────────────────────── */
-#picker-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:none;align-items:flex-end;justify-content:center;-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+#picker-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:none;align-items:flex-end;justify-content:center;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 #picker-overlay.open{display:-webkit-flex;display:flex}
-#picker-box{background:#fff;border-radius:20px 20px 0 0;padding:0 0 40px;width:100%;max-width:420px;-webkit-user-select:none;user-select:none;touch-action:none}
-#picker-header{display:-webkit-flex;display:flex;align-items:center;justify-content:space-between;padding:14px 20px 10px;border-bottom:1px solid #EEEEEA}
-#picker-label{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;color:#1A1A22}
-#picker-confirm{background:#E8381A;color:#fff;border:none;border-radius:9px;padding:8px 22px;font-size:15px;font-weight:700;cursor:pointer}
-#picker-cancel{background:transparent;color:#888;border:none;font-size:15px;cursor:pointer;padding:8px 12px}
-#picker-drum-wrap{position:relative;height:220px;overflow:hidden;margin:0 20px}
-#picker-drum{position:absolute;top:0;left:0;width:100%;transition:none;will-change:transform}
-.picker-item{height:44px;display:-webkit-flex;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;font-family:'Barlow Condensed',sans-serif;color:#CCCCCC;transition:color .1s,font-size .1s}
-.picker-item.selected{color:#1A1A22;font-size:32px}
-.picker-item.near{color:#888;font-size:28px}
-#picker-selection-line{position:absolute;top:88px;left:0;right:0;height:44px;border-top:2px solid #E8381A;border-bottom:2px solid #E8381A;pointer-events:none;background:rgba(232,56,26,.05)}
+#picker-box{background:#fff;border-radius:24px 24px 0 0;padding:0 0 48px;width:100%;max-width:440px;-webkit-user-select:none;user-select:none;touch-action:none;box-shadow:0 -8px 40px rgba(0,0,0,.2)}
+#picker-header{display:-webkit-flex;display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:1.5px solid #F0F0EA}
+#picker-label{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:20px;color:#1A1A22;letter-spacing:.5px}
+#picker-confirm{background:#E8381A;color:#fff;border:none;border-radius:10px;padding:10px 28px;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(232,56,26,.3)}
+#picker-cancel{background:transparent;color:#AAAAAA;border:none;font-size:15px;cursor:pointer;padding:10px 14px}
+#picker-drum-wrap{position:relative;height:240px;overflow:hidden;margin:0;cursor:grab}
+#picker-drum-wrap:active{cursor:grabbing}
+#picker-drum{position:absolute;top:0;left:0;width:100%;will-change:transform}
+.picker-item{height:48px;display:-webkit-flex;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;font-family:'Barlow Condensed',sans-serif;color:#DDDDDD;letter-spacing:.3px}
+.picker-item.near{color:#999999;font-size:27px;font-weight:700}
+.picker-item.selected{color:#1A1A22;font-size:36px;font-weight:800}
+#picker-selection-line{position:absolute;top:96px;left:16px;right:16px;height:48px;border-top:2px solid #E8381A;border-bottom:2px solid #E8381A;pointer-events:none;background:rgba(232,56,26,.04);border-radius:6px}
+#picker-fade-top{position:absolute;top:0;left:0;right:0;height:80px;background:linear-gradient(to bottom,rgba(255,255,255,1),rgba(255,255,255,0));pointer-events:none;z-index:2}
+#picker-fade-bottom{position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(to top,rgba(255,255,255,1),rgba(255,255,255,0));pointer-events:none;z-index:2}
 </style>
 </head>
 <body>
@@ -686,129 +691,154 @@ async function doLogout(){
   document.getElementById('auth-screen').style.display='flex';
 }
 // ── PICKER WHEEL ENGINE ──────────────────────────────────────────────────────
-const _pk = {active:false, exid:null, wk:0, si:0, type:null, step:0.5, values:[], idx:0, startY:0, startIdx:0, drumY:0, startDrumY:0, vel:0, lastY:0, lastT:0, raf:null};
-const ITEM_H = 44;
-const VISIBLE = 5; // items visible, centre is selected
+const _pk={exid:null,wk:0,si:0,type:null,values:[],
+  y:0,          // current translateY of drum
+  targetY:0,    // snapped target
+  velY:0,       // px/ms velocity
+  lastY:0,      // last touch Y
+  lastT:0,      // last touch time
+  dragging:false,
+  raf:null,
+  confirmed:false
+};
+const ITEM_H=48;
 
-function buildPickerValues(type, currentVal){
-  if(type==='w'){
-    const vals=[];
-    for(let v=0; v<=200; v+=0.5) vals.push(parseFloat(v.toFixed(1)));
-    return vals;
-  } else {
-    const vals=[];
-    for(let v=0; v<=50; v++) vals.push(v);
-    return vals;
-  }
+function pk_vals(type){
+  if(type==='w'){const a=[];for(let v=0;v<=200;v+=0.5)a.push(parseFloat(v.toFixed(1)));return a;}
+  const a=[];for(let v=0;v<=50;v++)a.push(v);return a;
+}
+function pk_idxToY(idx){ return -(idx*ITEM_H)+110; }  // 110 = centre offset (110 = 2.5 * ITEM_H)
+function pk_yToIdx(y){ return Math.round((110-y)/ITEM_H); }
+function pk_clampY(y){ const max=pk_idxToY(0); const min=pk_idxToY(_pk.values.length-1); return Math.max(min,Math.min(max,y)); }
+function pk_idxAt(){ return Math.max(0,Math.min(_pk.values.length-1, pk_yToIdx(_pk.y))); }
+
+function pk_buildDrum(){
+  const drum=document.getElementById('picker-drum');
+  let html='';
+  _pk.values.forEach((v,i)=>{
+    const lbl=_pk.type==='w'?(Number.isInteger(v)?v+'.0':v):v;
+    html+=`<div class="picker-item" data-i="${i}">${lbl}</div>`;
+  });
+  drum.innerHTML=html;
+  drum.style.transform=`translateY(${_pk.y}px)`;
+  pk_highlight();
 }
 
-function openPicker(exid, wk, si, type){
-  const step = type==='w' ? 0.5 : 1;
-  const disp = document.getElementById((type==='w'?'wi_':'ri_')+exid+'_'+wk+'_'+si+'_disp');
-  const curTxt = disp ? disp.textContent : '';
-  const cur = parseFloat(curTxt) || (type==='w' ? 20 : 8);
-
-  _pk.exid=exid; _pk.wk=wk; _pk.si=si; _pk.type=type; _pk.step=step;
-  _pk.values = buildPickerValues(type, cur);
-  _pk.idx = _pk.values.indexOf(type==='w' ? Math.round(cur*2)/2 : Math.round(cur));
-  if(_pk.idx < 0) _pk.idx = Math.round(_pk.values.length/2);
-
-  document.getElementById('picker-label').textContent = type==='w' ? 'Velg vekt (kg)' : 'Velg reps';
-  renderDrum(_pk.idx);
-
-  const overlay = document.getElementById('picker-overlay');
-  overlay.classList.add('open');
-
-  // Touch/mouse on drum
-  const drum = document.getElementById('picker-drum-wrap');
-  drum.ontouchstart = pkTouchStart;
-  drum.ontouchmove  = pkTouchMove;
-  drum.ontouchend   = pkTouchEnd;
-  drum.onmousedown  = pkTouchStart;
-  drum.onmousemove  = e=>{ if(_pk.dragging) pkTouchMove(e); };
-  drum.onmouseup    = pkTouchEnd;
+function pk_highlight(){
+  const centre=pk_idxAt();
+  const drum=document.getElementById('picker-drum');
+  if(!drum) return;
+  drum.querySelectorAll('.picker-item').forEach(el=>{
+    const i=parseInt(el.dataset.i);
+    const dist=Math.abs(i-centre);
+    el.className='picker-item'+(dist===0?' selected':dist===1?' near':'');
+  });
 }
 
-function renderDrum(centreIdx){
-  const drum = document.getElementById('picker-drum');
-  const total = _pk.values.length;
-  // Render a window of items: centreIdx ± 10
-  const from = Math.max(0, centreIdx - 10);
-  const to   = Math.min(total - 1, centreIdx + 10);
-  let html = '';
-  // top padding
-  html += `<div style="height:${from*ITEM_H}px"></div>`;
-  for(let i=from; i<=to; i++){
-    const dist = Math.abs(i - centreIdx);
-    const cls  = dist===0 ? 'selected' : dist===1 ? 'near' : '';
-    const v    = _pk.values[i];
-    const lbl  = _pk.type==='w' ? (Number.isInteger(v)?v+'.0':v) : v;
-    html += `<div class="picker-item ${cls}" data-idx="${i}">${lbl}</div>`;
-  }
-  // bottom padding
-  html += `<div style="height:${(total-1-to)*ITEM_H}px"></div>`;
-  drum.innerHTML = html;
-  // Position so centreIdx is in the middle (offset 2 items from top of window)
-  drum.style.transform = `translateY(${(88) - centreIdx*ITEM_H}px)`;
+function pk_setY(y){
+  _pk.y=y;
+  const drum=document.getElementById('picker-drum');
+  if(drum) drum.style.transform=`translateY(${y}px)`;
+  pk_highlight();
 }
 
-_pk.dragging = false;
-function pkTouchStart(e){
-  const t = e.touches ? e.touches[0] : e;
-  _pk.startY    = t.clientY;
-  _pk.startIdx  = _pk.idx;
-  _pk.dragging  = true;
-  _pk.vel       = 0;
-  _pk.lastY     = t.clientY;
-  _pk.lastT     = Date.now();
+function openPicker(exid,wk,si,type){
   cancelAnimationFrame(_pk.raf);
-  e.preventDefault();
+  _pk.exid=exid;_pk.wk=wk;_pk.si=si;_pk.type=type;
+  _pk.values=pk_vals(type);
+  // find current value
+  const disp=document.getElementById((type==='w'?'wi_':'ri_')+exid+'_'+wk+'_'+si+'_disp');
+  const cur=parseFloat(disp?.textContent)||( type==='w'?20:8 );
+  let startIdx=_pk.values.findIndex(v=>Math.abs(v-cur)<0.01);
+  if(startIdx<0) startIdx=Math.round(_pk.values.length/3);
+  _pk.y=pk_clampY(pk_idxToY(startIdx));
+  _pk.velY=0; _pk.dragging=false;
+  document.getElementById('picker-label').textContent=type==='w'?'Velg vekt (kg)':'Velg reps';
+  pk_buildDrum();
+  document.getElementById('picker-overlay').classList.add('open');
 }
-function pkTouchMove(e){
+
+function pk_onTouchStart(e){
+  cancelAnimationFrame(_pk.raf);
+  const t=e.touches?e.touches[0]:e;
+  _pk.dragging=true;
+  _pk.lastY=t.clientY;
+  _pk.lastT=performance.now();
+  _pk.velY=0;
+  e.preventDefault(); e.stopPropagation();
+}
+
+function pk_onTouchMove(e){
   if(!_pk.dragging) return;
-  const t  = e.touches ? e.touches[0] : e;
-  const dy = _pk.startY - t.clientY;
-  const steps = Math.round(dy / ITEM_H);
-  const newIdx = Math.max(0, Math.min(_pk.values.length-1, _pk.startIdx + steps));
-  if(newIdx !== _pk.idx){
-    _pk.idx = newIdx;
-    renderDrum(_pk.idx);
-    // haptic if available
-    if(window.navigator.vibrate) window.navigator.vibrate(5);
-  }
-  // track velocity
-  const now = Date.now();
-  _pk.vel = (t.clientY - _pk.lastY) / Math.max(1, now - _pk.lastT);
-  _pk.lastY = t.clientY; _pk.lastT = now;
+  const t=e.touches?e.touches[0]:e;
+  const now=performance.now();
+  const dy=t.clientY-_pk.lastY;
+  const dt=Math.max(1,now-_pk.lastT);
+  _pk.velY=dy/dt;  // px per ms
+  _pk.lastY=t.clientY;
+  _pk.lastT=now;
+  pk_setY(pk_clampY(_pk.y+dy));
+  // light haptic on item change
+  const prev=pk_idxAt();
+  if(window.navigator?.vibrate) window.navigator.vibrate(3);
+  e.preventDefault(); e.stopPropagation();
+}
+
+function pk_onTouchEnd(e){
+  if(!_pk.dragging) return;
+  _pk.dragging=false;
+  // Convert velocity from px/ms → px/frame (60fps = 16.67ms)
+  let vel=_pk.velY*16.67;
+  // momentum + snap
+  const decay=0.92;
+  const minVel=0.5;
+  const animate=()=>{
+    if(Math.abs(vel)>minVel){
+      vel*=decay;
+      pk_setY(pk_clampY(_pk.y+vel));
+      _pk.raf=requestAnimationFrame(animate);
+    } else {
+      // snap to nearest item
+      const idx=pk_idxAt();
+      const targetY=pk_idxToY(idx);
+      pk_snap(targetY);
+    }
+  };
+  _pk.raf=requestAnimationFrame(animate);
   e.preventDefault();
 }
-function pkTouchEnd(e){
-  _pk.dragging = false;
-  // momentum
-  if(Math.abs(_pk.vel) > 0.3){
-    let v = -_pk.vel * 12; // px to convert to steps
-    const momentum = ()=>{
-      if(Math.abs(v) < 0.5) return;
-      const steps = Math.round(v / ITEM_H * 0.6);
-      if(steps !== 0){
-        _pk.idx = Math.max(0, Math.min(_pk.values.length-1, _pk.idx + steps));
-        renderDrum(_pk.idx);
-      }
-      v *= 0.82;
-      _pk.raf = requestAnimationFrame(momentum);
-    };
-    _pk.raf = requestAnimationFrame(momentum);
-  }
-  e.preventDefault();
+
+function pk_snap(targetY){
+  // Smooth snap animation
+  const dist=targetY-_pk.y;
+  if(Math.abs(dist)<0.5){pk_setY(targetY);return;}
+  const step=dist*0.25;
+  pk_setY(_pk.y+step);
+  _pk.raf=requestAnimationFrame(()=>pk_snap(targetY));
 }
+
+// Attach events once DOM is ready
+function pk_attachEvents(){
+  const wrap=document.getElementById('picker-drum-wrap');
+  if(!wrap) return;
+  wrap.addEventListener('touchstart',pk_onTouchStart,{passive:false});
+  wrap.addEventListener('touchmove', pk_onTouchMove, {passive:false});
+  wrap.addEventListener('touchend',  pk_onTouchEnd,  {passive:false});
+  wrap.addEventListener('mousedown', pk_onTouchStart,{passive:false});
+  wrap.addEventListener('mousemove', e=>{if(_pk.dragging)pk_onTouchMove(e);},{passive:false});
+  wrap.addEventListener('mouseup',   pk_onTouchEnd,  {passive:false});
+}
+document.addEventListener('DOMContentLoaded', pk_attachEvents);
+// fallback if DOMContentLoaded already fired
+setTimeout(pk_attachEvents, 500);
 
 function confirmPicker(){
-  const val = _pk.values[_pk.idx];
-  if(_pk.type==='w') setW(_pk.exid, _pk.wk, _pk.si, String(val));
-  else               setR(_pk.exid, _pk.wk, _pk.si, String(val));
-  // Update display immediately
-  const disp = document.getElementById((_pk.type==='w'?'wi_':'ri_')+_pk.exid+'_'+_pk.wk+'_'+_pk.si+'_disp');
-  if(disp){ disp.textContent=val; disp.classList.remove('prefilled'); }
+  const idx=pk_idxAt();
+  const val=_pk.values[idx];
+  if(_pk.type==='w') setW(_pk.exid,_pk.wk,_pk.si,String(val));
+  else               setR(_pk.exid,_pk.wk,_pk.si,String(val));
+  const disp=document.getElementById((_pk.type==='w'?'wi_':'ri_')+_pk.exid+'_'+_pk.wk+'_'+_pk.si+'_disp');
+  if(disp){disp.textContent=(_pk.type==='w'&&Number.isInteger(val)?val+'.0':val);disp.classList.remove('prefilled');}
   closePicker();
 }
 function closePicker(){
@@ -1353,8 +1383,10 @@ function exportExcel(){
       <button id="picker-confirm" onclick="confirmPicker()">OK</button>
     </div>
     <div id="picker-drum-wrap">
+      <div id="picker-fade-top"></div>
       <div id="picker-selection-line"></div>
       <div id="picker-drum"></div>
+      <div id="picker-fade-bottom"></div>
     </div>
   </div>
 </div>
