@@ -266,6 +266,13 @@ input[type=number]{-moz-appearance:textfield}
 #picker-selection-line{position:absolute;top:96px;left:16px;right:16px;height:48px;border-top:2px solid #E8381A;border-bottom:2px solid #E8381A;pointer-events:none;background:rgba(232,56,26,.04);border-radius:6px}
 #picker-fade-top{position:absolute;top:0;left:0;right:0;height:80px;background:linear-gradient(to bottom,rgba(255,255,255,1),rgba(255,255,255,0));pointer-events:none;z-index:2}
 #picker-fade-bottom{position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(to top,rgba(255,255,255,1),rgba(255,255,255,0));pointer-events:none;z-index:2}
+
+/* ── READ-ONLY / LOCKED STATE ─────────────────────────────────────────────── */
+.readonly-overlay{position:absolute;inset:0;z-index:10;cursor:not-allowed}
+.ex-body.readonly{position:relative;opacity:0.72;pointer-events:none}
+.ex-body.readonly::after{content:'';position:absolute;inset:0;z-index:5;cursor:not-allowed}
+.readonly-banner{background:#F5F5F0;border:1px solid #E0E0DA;border-radius:8px;padding:8px 12px;font-size:12px;color:#888;text-align:center;margin-bottom:8px}
+.scroll-val.readonly-val{color:#BBBBBB}
 </style>
 </head>
 <body>
@@ -742,6 +749,7 @@ function pk_setY(y){
 }
 
 function openPicker(exid,wk,si,type){
+  if(_readOnly) return;
   cancelAnimationFrame(_pk.raf);
   _pk.exid=exid;_pk.wk=wk;_pk.si=si;_pk.type=type;
   _pk.values=pk_vals(type);
@@ -851,20 +859,31 @@ function autoCopyDown(id,wk,si,type,val,def){
 }
 
 function confirmPicker(){
+  // Always close first — before any other logic that might fail
+  const ov = document.getElementById('picker-overlay');
+  if(ov) ov.style.display = 'none';
   cancelAnimationFrame(_pk.raf);
-  const idx=pk_idxAt();
-  const val=_pk.values[idx];
-  const valStr=String(val);
-  const def=getDefSets(_pk.exid,_pk.wk);
-  if(_pk.type==='w') setW(_pk.exid,_pk.wk,_pk.si,valStr);
-  else               setR(_pk.exid,_pk.wk,_pk.si,valStr);
-  // Update display label
-  const dispLbl=_pk.type==='w'&&Number.isInteger(val)?val+'.0':val;
-  const disp=document.getElementById((_pk.type==='w'?'wi_':'ri_')+_pk.exid+'_'+_pk.wk+'_'+_pk.si+'_disp');
-  if(disp){disp.textContent=dispLbl;disp.classList.remove('prefilled');}
-  // Auto-copy to subsequent unfilled sets
-  autoCopyDown(_pk.exid,_pk.wk,_pk.si,_pk.type,dispLbl,def);
-  closePicker();
+
+  try {
+    const idx  = pk_idxAt();
+    const val  = _pk.values[idx];
+    const valStr = String(val);
+    const dispLbl = (_pk.type==='w' && Number.isInteger(val)) ? val+'.0' : String(val);
+
+    // Update data
+    if(_pk.type==='w') setW(_pk.exid,_pk.wk,_pk.si,valStr);
+    else               setR(_pk.exid,_pk.wk,_pk.si,valStr);
+
+    // Update display element
+    const disp = document.getElementById((_pk.type==='w'?'wi_':'ri_')+_pk.exid+'_'+_pk.wk+'_'+_pk.si+'_disp');
+    if(disp){ disp.textContent=dispLbl; disp.classList.remove('prefilled'); }
+
+    // Auto-copy to subsequent unfilled sets
+    const def = getDefSets(_pk.exid, _pk.wk);
+    autoCopyDown(_pk.exid,_pk.wk,_pk.si,_pk.type,dispLbl,def);
+  } catch(e) {
+    console.error('confirmPicker error:', e);
+  }
 }
 function closePicker(){
   cancelAnimationFrame(_pk.raf);
@@ -896,6 +915,7 @@ async function initApp(){
 const K={w:(id,wk,si)=>`${id}|w${wk}|s${si}`,r:(id,wk,si)=>`${id}|w${wk}|s${si}|rep`,fb:(id,wk,si)=>`${id}|w${wk}|s${si}|fb`,nt:(id,wk)=>`${id}|w${wk}|notes`,cnt:(id,wk)=>`${id}|w${wk}|count`,sStart:(d,wk)=>`session|${d}|w${wk}|start`,sEnd:(d,wk)=>`session|${d}|w${wk}|end`,sLocked:(d,wk)=>`session|${d}|w${wk}|locked`};
 const FB={up:{lbl:"↑",cls:"up"},same:{lbl:"→",cls:"same"},down:{lbl:"↓",cls:"down"}};
 const fmtT=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+let _readOnly=false;  // set true when session is not active
 const fmtR=s=>s>=120?"2 min":"90 sek";
 function getCount(id,wk,def){const v=S.data[K.cnt(id,wk)];return v!==undefined?parseInt(v):(def||3);}
 function hasFilled(id,wk,def){const cnt=getCount(id,wk,def);for(let i=0;i<cnt;i++)if(S.data[K.w(id,wk,i)])return true;return false;}
@@ -951,14 +971,15 @@ function buildScrollCtrl(id, wk, si, type, dispVal, isPrefilled, step, unit){
   const cls = type==='w' ? 'weight-ctrl'+(dispVal&&!isPrefilled?' filled':'') : 'reps-ctrl';
   const inputId = (type==='w'?'wi_':'ri_')+id+'_'+wk+'_'+si;
   const ctrlId  = (type==='w'?'wc_':'rc_')+id+'_'+wk+'_'+si;
+  const ro = _readOnly;
   return `<div class="${cls}" id="${ctrlId}"
-    style="-webkit-flex:${type==='w'?'1':'0 0 108px'};flex:${type==='w'?'1':'0 0 108px'};cursor:pointer"
-    onclick="openPicker('${id}',${wk},${si},'${type}')">
+    style="-webkit-flex:${type==='w'?'1':'0 0 108px'};flex:${type==='w'?'1':'0 0 108px'};cursor:${ro?'default':'pointer'}"
+    ${ro?'':'onclick="openPicker(''+id+'','+wk+','+si+',''+type+'')"'}>
     <div class="scroll-input-wrap">
-      <div class="scroll-arrows" style="color:#DDDDDD;font-size:10px">▲</div>
+      <div class="scroll-arrows" style="color:${ro?'transparent':'#DDDDDD'};font-size:10px">▲</div>
       <div class="scroll-val${isPrefilled?' prefilled':''}" id="${inputId}_disp">${dispVal||'—'}</div>
       <div class="scroll-unit">${unit}</div>
-      <div class="scroll-arrows" style="color:#DDDDDD;font-size:10px">▼</div>
+      <div class="scroll-arrows" style="color:${ro?'transparent':'#DDDDDD'};font-size:10px">▼</div>
     </div>
   </div>`;
 }
@@ -1009,11 +1030,17 @@ function buildSetRows(ex,wk,def){
 }
 function buildExBody(ex,wk,def){
   const note=S.data[K.nt(ex.id,wk)]||'';
-  return`<div class="ex-body">
+  const ro=_readOnly;
+  return`<div class="ex-body${ro?' readonly':''}">
+    ${ro&&note?`<div class="readonly-banner">🔒 ${note}</div>`:''}
     ${buildSetRows(ex,wk,def)}
-    <button class="add-set-btn" onclick="addSet('${ex.id}',${wk},${def})">+ Legg til sett</button>
-    <textarea class="notes-area" placeholder="Notater til øvelsen…" oninput="setNote('${ex.id}',${wk},this.value)">${note}</textarea>
-    <div style="overflow:hidden"><button class="timer-btn" onclick="startTimer(${ex.rest||90})">⏱ ${fmtR(ex.rest||90)} pause ▶</button></div>
+    ${ro?'':
+      `<button class="add-set-btn" onclick="addSet('${ex.id}',${wk},${def})">+ Legg til sett</button>
+       <textarea class="notes-area" placeholder="Notater til øvelsen…" oninput="setNote('${ex.id}',${wk},this.value)">${note}</textarea>`
+    }
+    ${ro?'':
+      `<div style="overflow:hidden"><button class="timer-btn" onclick="startTimer(${ex.rest||90})">⏱ ${fmtR(ex.rest||90)} pause ▶</button></div>`
+    }
     <div style="clear:both;height:4px"></div>
   </div>`;
 }
@@ -1097,12 +1124,13 @@ function render(){
   const pct=allExIds.length?(filled/allExIds.length)*100:0;
   const isDone=filled===allExIds.length&&allExIds.length>0;
   const sess=getSessionState(day,wk);
+  _readOnly = (sess.state !== 'active');
   const sessionHTML=(()=>{
     if(sess.state==='idle') return `
       <div class="session-bar">
         <div style="flex:1">
           <div style="font-size:13px;font-weight:600">Klar til å trene?</div>
-          <div class="session-info">Start økten for å ta tiden</div>
+          <div class="session-info" style="color:#E8B84B">🔒 Start økten for å kunne logge vekter</div>
         </div>
         <button class="session-start-btn" onclick="startSession()">▶ Start økt</button>
       </div>`;
