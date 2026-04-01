@@ -510,19 +510,20 @@ async function sbSelect() {
 }
 
 async function tryRestoreSession() {
-  // Try stored token first
-  const storedToken = sbLoad('sb_token');
-  const storedUid   = sbLoad('sb_uid');
-  const storedEmail = sbLoad('sb_email');
-  if (storedToken && storedUid) {
-    _token = storedToken; _userId = storedUid; _userEmail = storedEmail;
-    // Verify token is still valid with a lightweight call
-    const r = await sbFetch('/auth/v1/user', 'GET', null, true);
-    if (!r.error) return true;
-    // Token expired — try refresh
-    const refreshed = await sbRefreshSession();
-    if (refreshed) return true;
-    // Refresh failed, clear
+  try {
+    const storedToken = sbLoad('sb_token');
+    const storedUid   = sbLoad('sb_uid');
+    const storedEmail = sbLoad('sb_email');
+    if (storedToken && storedUid) {
+      _token = storedToken; _userId = storedUid; _userEmail = storedEmail;
+      const r = await sbFetch('/auth/v1/user', 'GET', null, true);
+      if (!r.error) return true;
+      const refreshed = await sbRefreshSession();
+      if (refreshed) return true;
+      _token = null; _userId = null; _userEmail = null;
+    }
+  } catch(e) {
+    console.error('tryRestoreSession error:', e);
     _token = null; _userId = null; _userEmail = null;
   }
   return false;
@@ -665,12 +666,17 @@ async function doLogin(){
   btn.disabled=true;btn.textContent='Logger inn…';
   try {
     const {error} = await sbSignIn(email, pass);
-    btn.disabled=false;btn.textContent='Logg inn';
-    if(error) err.textContent = error==='Invalid login credentials'||error.includes('invalid')?'Feil e-post eller passord.':error;
-    else { /* session started via onAuthStateChange equivalent below */ await initApp(); }
+    btn.disabled=false; btn.textContent='Logg inn';
+    if(error){
+      err.textContent = (error==='Invalid login credentials'||error.toLowerCase().includes('invalid'))
+        ? 'Feil e-post eller passord.' : error;
+    } else {
+      await initApp();
+    }
   } catch(e) {
-    btn.disabled=false;btn.textContent='Logg inn';
-    err.textContent = 'Noe gikk galt: '+e.message;
+    btn.disabled=false; btn.textContent='Logg inn';
+    err.textContent = 'Feil: ' + (e.message||'ukjent');
+    console.error('Login exception:', e);
   }
 }
 async function doSignup(){
@@ -895,14 +901,27 @@ function closePicker(){
 // onInputFocus removed - using picker
 
 async function initApp(){
-  S.userId = _userId;
-  document.getElementById('sync-user-label').textContent = _userEmail || '';
-  await cloudLoad();
-  if(!S.days) S.days = JSON.parse(JSON.stringify(DEFAULT_DAYS));
-  document.getElementById('auth-screen').style.display='none';
-  document.getElementById('main-app').style.display='';
+  try {
+    S.userId = _userId;
+    document.getElementById('sync-user-label').textContent = _userEmail || '';
+    await cloudLoad();
+    if(!S.days) S.days = JSON.parse(JSON.stringify(DEFAULT_DAYS));
+    // Clamp dayIdx in case saved value is out of range
+    if(S.dayIdx >= S.days.length) S.dayIdx = 0;
+  } catch(e) {
+    console.error('initApp load error:', e);
+    S.days = JSON.parse(JSON.stringify(DEFAULT_DAYS));
+    S.dayIdx = 0; S.week = 1;
+  }
+  // Show main app - do this before render so DOM is ready
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
   setSyncStatus('saved');
-  render();
+  try {
+    render();
+  } catch(e) {
+    console.error('render error after login:', e);
+  }
 }
 
 // On page load: try to restore existing session
