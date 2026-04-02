@@ -991,16 +991,19 @@ function buildScrollCtrl(id, wk, si, type, dispVal, isPrefilled, step, unit){
   const inputId = (type==='w'?'wi_':'ri_')+id+'_'+wk+'_'+si;
   const ctrlId  = (type==='w'?'wc_':'rc_')+id+'_'+wk+'_'+si;
   const ro = _readOnly;
-  return `<div class="${cls}" id="${ctrlId}"
-    style="-webkit-flex:${type==='w'?'1':'0 0 108px'};flex:${type==='w'?'1':'0 0 108px'};cursor:${ro?'default':'pointer'}"
-    ${ro?'':'onclick="openPicker(''+id+'','+wk+','+si+',''+type+'')"'}>
-    <div class="scroll-input-wrap">
-      <div class="scroll-arrows" style="color:${ro?'transparent':'#DDDDDD'};font-size:10px">▲</div>
-      <div class="scroll-val${isPrefilled?' prefilled':''}" id="${inputId}_disp">${dispVal||'—'}</div>
-      <div class="scroll-unit">${unit}</div>
-      <div class="scroll-arrows" style="color:${ro?'transparent':'#DDDDDD'};font-size:10px">▼</div>
-    </div>
-  </div>`;
+  const flex = type==='w' ? '1' : '0 0 108px';
+  const cursor = ro ? 'default' : 'pointer';
+  const arrowColor = ro ? 'transparent' : '#DDDDDD';
+  const clickAttr = ro ? '' : 'onclick="openPicker(\'' + id + '\',' + wk + ',' + si + ',\'' + type + '\')"';
+  return '<div class="' + cls + '" id="' + ctrlId + '" '
+    + 'style="-webkit-flex:' + flex + ';flex:' + flex + ';cursor:' + cursor + '" '
+    + clickAttr + '>'
+    + '<div class="scroll-input-wrap">'
+    + '<div class="scroll-arrows" style="color:' + arrowColor + ';font-size:10px">&#9650;</div>'
+    + '<div class="scroll-val' + (isPrefilled?' prefilled':'') + '" id="' + inputId + '_disp">' + (dispVal||'&mdash;') + '</div>'
+    + '<div class="scroll-unit">' + unit + '</div>'
+    + '<div class="scroll-arrows" style="color:' + arrowColor + ';font-size:10px">&#9660;</div>'
+    + '</div></div>';
 }
 
 function buildSetRows(ex,wk,def){
