@@ -50,7 +50,7 @@ break;case"<bookViews":;case"<bookViews>":;case"</bookViews>":break;case"<workbo
 </div>
 
 <!-- CATALOG MODAL -->
-<div class="modal-bg" id="modal-catalog">
+<div class="modal-bg" style="display:none;visibility:hidden" id="modal-catalog">
   <div class="modal" style="padding-bottom:50px;max-height:92vh">
     <h3>Øvelseskatalog</h3>
     <div style="position:relative;margin-bottom:12px">
@@ -69,7 +69,7 @@ break;case"<bookViews":;case"<bookViews>":;case"</bookViews>":break;case"<workbo
 </div>
 
 <!-- EXERCISE DETAIL MODAL -->
-<div class="modal-bg" id="modal-ex-detail">
+<div class="modal-bg" style="display:none;visibility:hidden" id="modal-ex-detail">
   <div class="modal" style="padding-bottom:44px">
     <div id="ex-detail-content"></div>
     <div style="display:flex;gap:8px;margin-top:16px">
@@ -224,8 +224,8 @@ input[type=number]{-moz-appearance:textfield}
 .info-box strong{color:#1A1A22}
 
 /* MODAL */
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:none;align-items:flex-end;justify-content:center}
-.modal-bg.open{display:flex}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:-webkit-flex;display:flex;align-items:flex-end;justify-content:center;visibility:hidden}
+.modal-bg.open{visibility:visible}
 .modal{background:#FFFFFF;border:1px solid #D8D8D2;border-radius:20px 20px 0 0;padding:22px 20px 44px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto}
 .modal h3{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:22px;margin-bottom:16px;color:#1A1A22}
 .modal-label{font-size:12px;color:#1A1A22;letter-spacing:1px;text-transform:uppercase;margin-bottom:7px;margin-top:16px;font-weight:600}
@@ -416,7 +416,7 @@ input[type=number]{-moz-appearance:textfield}
 </div>
 
 <!-- ADD EXERCISE -->
-<div class="modal-bg" id="modal-add-ex">
+<div class="modal-bg" style="display:none;visibility:hidden" id="modal-add-ex">
   <div class="modal">
     <h3>Legg til øvelse</h3>
     <div class="modal-label">Øvelsesnavn</div>
@@ -444,7 +444,7 @@ input[type=number]{-moz-appearance:textfield}
 </div>
 
 <!-- ADD DAY -->
-<div class="modal-bg" id="modal-add-day">
+<div class="modal-bg" style="display:none;visibility:hidden" id="modal-add-day">
   <div class="modal">
     <h3>Legg til treningsdag</h3>
     <div class="modal-label">Dag / navn</div>
@@ -463,7 +463,7 @@ input[type=number]{-moz-appearance:textfield}
 </div>
 
 <!-- MANAGE -->
-<div class="modal-bg" id="modal-manage">
+<div class="modal-bg" style="display:none;visibility:hidden" id="modal-manage">
   <div class="modal">
     <h3>Administrer</h3>
     <div class="modal-label">Treningsdager</div>
@@ -475,7 +475,7 @@ input[type=number]{-moz-appearance:textfield}
 </div>
 
 <!-- CHART MODAL -->
-<div class="modal-bg" id="chart-modal">
+<div class="modal-bg" style="display:none;visibility:hidden" id="chart-modal">
   <div class="modal">
     <h3>Progresjon</h3>
     <div class="modal-label">Velg øvelse</div>
@@ -1527,8 +1527,21 @@ function addSet(id,wk,def){S.data[K.cnt(id,wk)]=String(getCount(id,wk,def)+1);sc
 function delSet(id,wk,def){const cnt=getCount(id,wk,def);if(cnt>1){S.data[K.cnt(id,wk)]=String(cnt-1);scheduleSave();render();}}
 
 // MODALS
-function openModal(id){document.getElementById(id).classList.add('open');}
-function closeModal(id){document.getElementById(id).classList.remove('open');}
+function openModal(id){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.style.display='flex';
+  el.style.webkitDisplay='flex';
+  el.style.visibility='visible';
+  el.classList.add('open');
+}
+function closeModal(id){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.style.display='none';
+  el.style.visibility='hidden';
+  el.classList.remove('open');
+}
 function setExType(t){
   S.newExType=t;
   const s=document.getElementById('ex-type-single'),ss=document.getElementById('ex-type-ss');
@@ -1899,7 +1912,7 @@ function exportExcel(){
 </div>
 
 <!-- CATALOG MODAL -->
-<div class="modal-bg" id="modal-catalog">
+<div class="modal-bg" style="display:none;visibility:hidden" id="modal-catalog">
   <div class="modal" style="padding-bottom:50px;max-height:92vh">
     <h3>Øvelseskatalog</h3>
     <div style="position:relative;margin-bottom:12px">
@@ -1918,7 +1931,7 @@ function exportExcel(){
 </div>
 
 <!-- EXERCISE DETAIL MODAL -->
-<div class="modal-bg" id="modal-ex-detail">
+<div class="modal-bg" style="display:none;visibility:hidden" id="modal-ex-detail">
   <div class="modal" style="padding-bottom:44px">
     <div id="ex-detail-content"></div>
     <div style="display:flex;gap:8px;margin-top:16px">
